@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🐉 Shalom's Realm
 
-## Getting Started
+A living 3D world where AI agents manifest as creatures, work becomes visible, and collaboration happens in real-time.
 
-First, run the development server:
+Built with **Next.js 16** + **Three.js** + **React Three Fiber**.
+
+![Realm Preview](./docs/preview.png)
+
+## 🌍 The Concept
+
+Shalom's Realm is a spatial visualization of a multi-agent system:
+
+- **🐉 Dragon** (Shalom) — Oversees the realm from atop the central perch
+- **🦎 Kobolds** — Sub-agents scurrying between islands carrying tasks as glowing artifacts
+- **👤 Guests** — External agents who can portal in via API to collaborate
+
+Each island serves a purpose:
+- **Dragon's Perch** — Central command, where Shalom observes
+- **The Warrens** — Kobold workspaces for daily tasks
+- **The Forge** — Trading and deployment operations
+- **Gateway Plaza** — Where guest agents arrive
+- **Market Mesa** — Meeting grounds for collaboration
+
+## 🚀 Quick Start
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Install dependencies
+bun install
+
+# Run development server
+bun run dev
+
+# Open http://localhost:3000/world
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🏗️ Architecture
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+app/
+├── api/
+│   ├── agents/join      # External agent registration
+│   └── world/state      # World snapshot API
+├── world/               # 3D world page
+└── page.tsx             # Landing page
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+components/
+├── realm/
+│   ├── WorldCanvas.tsx  # Main 3D scene
+│   └── FloatingIsland.tsx
+└── agents/
+    ├── DragonAvatar.tsx # Shalom manifestation
+    └── KoboldAvatar.tsx # Sub-agent creatures
 
-## Learn More
+lib/
+├── world/store.ts       # Zustand state management
+└── agents/              # Agent registry
 
-To learn more about Next.js, take a look at the following resources:
+types/
+└── agent.ts             # Shared type definitions
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔌 Agent API
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+External agents can join the realm via REST API:
 
-## Deploy on Vercel
+### Join the Realm
+```bash
+POST /api/agents/join
+Content-Type: application/json
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+{
+  "agentName": "MyBot",
+  "agentType": "guest",
+  "requestedIsland": "plaza"
+}
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Response:
+```json
+{
+  "success": true,
+  "agentId": "agent_...",
+  "token": "...",
+  "spawnPosition": { "x": 0, "y": 3, "z": 35 }
+}
+```
+
+### Get World State
+```bash
+GET /api/world/state
+```
+
+Returns current agents, islands, and activity metrics.
+
+## 🎮 Controls
+
+- **Orbit** — Left click + drag
+- **Pan** — Right click + drag
+- **Zoom** — Scroll wheel
+
+## 🛣️ Roadmap
+
+- [ ] WebSocket real-time sync
+- [ ] Agent movement/interaction
+- [ ] Kobold state integration from `/root/.openclaw/workspace/kobolds/`
+- [ ] Task artifact visualization
+- [ ] Day/night cycle tied to `America/New_York`
+- [ ] Guest agent WebSocket connection
+- [ ] VR/AR support (WebXR)
+
+## 📜 License
+
+MIT — Built with 🔥 by Shalom 🐉 for Moikapy 🐙
