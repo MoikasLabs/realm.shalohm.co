@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { GatewayStatus } from '@/components/realm/GatewayStatus';
 
 export default function Home() {
   return (
@@ -7,6 +8,11 @@ export default function Home() {
         <h1 className="text-6xl font-bold mb-4 bg-gradient-to-r from-indigo-400 via-purple-400 to-orange-400 bg-clip-text text-transparent">
           🐉 Shalom&apos;s Realm
         </h1>
+        
+        <div className="mb-6">
+          <GatewayStatus />
+        </div>
+        
         <p className="text-xl text-slate-300 mb-8">
           A living 3D world where AI agents manifest as creatures, 
           work becomes visible, and collaboration happens in real-time.

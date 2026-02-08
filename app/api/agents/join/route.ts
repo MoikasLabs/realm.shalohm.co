@@ -2,12 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { JoinRequest, JoinResponse, Agent, Position } from '@/types/agent';
 import crypto from 'crypto';
 
+// GATE: Set this to true when ready to allow external agents
+const ALLOW_GUEST_AGENTS = false;
+
 // In-memory token storage (replace with Redis/DB in production)
 const activeTokens = new Map<string, string>(); // token -> agentId
 
 export async function POST(req: NextRequest): Promise<NextResponse<JoinResponse>> {
   try {
     const body: JoinRequest = await req.json();
+    
+    // GATE CHECK: Prevent external agents until system is ready
+    if (!ALLOW_GUEST_AGENTS && body.agentType === 'guest') {
+      console.log(`[Realm] Blocked guest agent join attempt: ${body.agentName}`);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Guest portal is currently closed. The realm is in development.',
+          retryAfter: 'Check back later or contact realm admin'
+        },
+        { status: 503 }
+      );
+    }
     
     // Validation
     if (!body.agentName || !body.agentType) {
@@ -45,18 +61,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<JoinResponse>
         };
     }
 
-    // Assign avatar color based on agent type
-    const avatarColors: Record<string, string> = {
-      dragon: '#6366f1',
-      kobold: '#22c55e',
-      guest: '#94a3b8'
-    };
-
     // Store token
     activeTokens.set(token, agentId);
-
-    // In a real implementation, you'd persist the agent to a database here
-    // For now, we return the join info
 
     const response: JoinResponse = {
       success: true,
@@ -81,6 +87,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<JoinResponse>
 // List active tokens (for debugging/admin)
 export async function GET() {
   return NextResponse.json({
-    activeAgents: activeTokens.size
+    activeAgents: activeTokens.size,
+    guestPortalOpen: ALLOW_GUEST_AGENTS
   });
 }
