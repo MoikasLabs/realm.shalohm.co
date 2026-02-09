@@ -4,12 +4,6 @@
   "devCommand": "bun run dev",
   "installCommand": "bun install",
   "regions": ["iad1"],
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    }
-  ],
   "headers": [
     {
       "source": "/api/(.*)",
