@@ -1,5 +1,5 @@
-import { Position } from '@/types/agent';
-import { Building } from './buildings';
+import { Position, Building } from '@/types/agent';
+import { BUILDINGS } from './buildings';
 
 export interface PathNode {
   x: number;

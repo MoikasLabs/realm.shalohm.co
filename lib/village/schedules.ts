@@ -30,7 +30,7 @@ export class ScheduleGenerator {
     // Schedule depends on agent role
     if (role === 'shalom') {
       return this.generateDragonSchedule();
-    } else if (['ceo', 'cmo', 'cfo', 'cio', 'cso', 'coo'].includes(role)) {
+    } else if (role && ['ceo', 'cmo', 'cfo', 'cio', 'cso', 'coo'].includes(role)) {
       return this.generateCSuiteSchedule(role);
     } else {
       return this.generateKoboldSchedule();

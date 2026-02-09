@@ -131,7 +131,7 @@ export class SocialSystem {
     if (!interaction || !interaction.isActive) return;
     
     // Generate message based on context
-    const message = this.generateMessage(interaction.topic, sender.subtype);
+    const message = this.generateMessage(interaction.topic, sender.subtype || 'kobold');
     
     const chatMessage: ChatMessage = {
       agentId: sender.id,
@@ -158,7 +158,7 @@ export class SocialSystem {
     const topics: string[] = [];
     
     for (const role of roles) {
-      const roleTopics = TOPICS_BY_ROLE[role] || TOPICS_BY_ROLE.kobold;
+      const roleTopics = TOPICS_BY_ROLE[role || 'kobold'] || TOPICS_BY_ROLE.kobold;
       topics.push(...roleTopics);
     }
     
@@ -288,7 +288,7 @@ export class SocialSystem {
       ]
     };
     
-    const roleMono = monologues[agent.subtype] || monologues.kobold;
+    const roleMono = monologues[agent.subtype || 'kobold'] || monologues.kobold;
     return roleMono[Math.floor(Math.random() * roleMono.length)];
   }
 }

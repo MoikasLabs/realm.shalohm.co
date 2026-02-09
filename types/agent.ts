@@ -25,7 +25,7 @@ export interface AvatarConfig {
   color: string;
   scale: number;
   glowColor?: string;
-  shape: 'dragon' | 'kobold' | 'slime' | 'sphere' | 'custom';
+  shape: 'dragon' | 'kobold' | 'slime' | 'sphere' | 'custom' | 'cube';
 }
 
 export interface Position {
@@ -34,7 +34,7 @@ export interface Position {
   z: number;
 }
 
-export type AgentStatus = 'idle' | 'working' | 'traveling' | 'resting' | 'sleeping' | 'error';
+export type AgentStatus = 'idle' | 'working' | 'traveling' | 'resting' | 'sleeping' | 'error' | 'meeting';
 
 export interface Task {
   id: string;

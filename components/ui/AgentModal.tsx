@@ -56,7 +56,7 @@ export function AgentModal() {
             <div>
               <h2 className="text-xl font-bold text-white">{agent.name}</h2>
               <p className="text-sm text-indigo-200">
-                {isDragon ? 'Dragon Overseer' : agent.subtype.toUpperCase()}
+                {isDragon ? 'Dragon Overseer' : (agent.subtype || agent.type || 'Agent').toUpperCase()}
               </p>
             </div>
           </div>
@@ -135,11 +135,11 @@ export function AgentModal() {
               )}
 
               {/* Goals */}
-              {agent.goals?.length > 0 && (
+              {(agent.goals?.length || 0) > 0 && (
                 <div className="bg-slate-700/50 p-3 rounded-lg">
                   <p className="text-xs text-gray-400 uppercase mb-2">Goals</p>
                   <ul className="space-y-1">
-                    {agent.goals.map((goal, i) => (
+                    {agent.goals?.map((goal, i) => (
                       <li key={i} className="flex items-center gap-2 text-sm text-gray-300">
                         <span className="text-indigo-400">▸</span> {goal}
                       </li>
@@ -190,8 +190,8 @@ export function AgentModal() {
 
           {activeTab === 'schedule' && (
             <div className="space-y-2">
-              {agent.schedule?.length > 0 ? (
-                agent.schedule.map((task, i) => {
+              {(agent.schedule?.length || 0) > 0 ? (
+                (agent.schedule || []).map((task, i) => {
                   const timeStr = Math.floor(task.startTime).toString().padStart(2, '0') + ':' + 
                     Math.floor((task.startTime % 1) * 60).toString().padStart(2, '0');
                   const building = buildings.get(task.building);
