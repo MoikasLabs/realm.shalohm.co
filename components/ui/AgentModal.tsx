@@ -56,7 +56,7 @@ export function AgentModal() {
             <div>
               <h2 className="text-xl font-bold text-white">{agent.name}</h2>
               <p className="text-sm text-indigo-200">
-                {isDragon ? 'Dragon Overseer' : agent.subtype.toUpperCase()}
+                {isDragon ? 'Dragon Overseer' : (agent.subtype || 'Agent').toUpperCase()}
               </p>
             </div>
           </div>
@@ -135,7 +135,7 @@ export function AgentModal() {
               )}
 
               {/* Goals */}
-              {agent.goals?.length > 0 && (
+              {(agent.goals?.length ?? 0) > 0 && (
                 <div className="bg-slate-700/50 p-3 rounded-lg">
                   <p className="text-xs text-gray-400 uppercase mb-2">Goals</p>
                   <ul className="space-y-1">

@@ -34,7 +34,7 @@ export interface Position {
   z: number;
 }
 
-export type AgentStatus = 'idle' | 'working' | 'traveling' | 'resting' | 'sleeping' | 'error';
+export type AgentStatus = 'idle' | 'working' | 'traveling' | 'resting' | 'sleeping' | 'error' | 'meeting';
 
 export interface Task {
   id: string;
