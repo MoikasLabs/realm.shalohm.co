@@ -32,7 +32,7 @@ interface VillageStore extends VillageWorldState {
   setTimeOfDay: (hour: number) => void;
   setWeather: (weather: VillageWorldState['weather']) => void;
   selectAgent: (agentId: string | null) => void;
-  toggleAdminMode: () => void;
+  toggleAdminMode: (authToken?: string) => boolean;
   nextDay: () => void;
   
   // Getters
@@ -463,7 +463,30 @@ export const useVillageStore = create<VillageStore>((set, get) => ({
   setTimeOfDay: (hour) => set({ timeOfDay: hour }),
   setWeather: (weather) => set({ weather }),
   selectAgent: (agentId) => set({ selectedAgent: agentId }),
-  toggleAdminMode: () => set((state) => ({ adminMode: !state.adminMode })),
+  toggleAdminMode: (authToken?: string) => {
+    // Disabling admin mode doesn't require auth
+    if (!authToken) {
+      set((state) => {
+        if (state.adminMode) {
+          // Allow disabling without auth
+          return { adminMode: false };
+        }
+        // Reject enabling without auth
+        return state;
+      });
+      return false;
+    }
+
+    // Enabling admin mode requires valid auth token
+    // Validate the token format (should be a valid API key)
+    if (!authToken.startsWith('rlm_')) {
+      return false;
+    }
+
+    // Token is valid format - enable admin mode
+    set({ adminMode: true });
+    return true;
+  },
   nextDay: () => set((state) => ({ day: state.day + 1 })),
 
   // Getters

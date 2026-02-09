@@ -2,15 +2,60 @@
 
 import { useVillageStore } from '@/lib/store/villageStore';
 import { BUILDINGS } from '@/lib/village/buildings';
+import { useState } from 'react';
 
 export function WorldUI() {
   const store = useVillageStore();
   const { agents, timeOfDay, day, adminMode, selectedAgent, buildings } = store;
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [authToken, setAuthToken] = useState('');
   
   const agentsArray = Array.from(agents.values());
   const occupiedBuildings = Array.from(buildings.values()).filter(b => b.isOccupied);
   
   const isNight = timeOfDay < 6 || timeOfDay > 20;
+
+  const handleAdminToggle = () => {
+    if (adminMode) {
+      // Disable admin mode without auth
+      store.toggleAdminMode();
+    } else {
+      // Require auth to enable admin mode
+      setShowAuthPrompt(true);
+    }
+  };
+
+  const handleAuthSubmit = async () => {
+    if (!authToken.trim()) return;
+
+    try {
+      // Verify API key with server
+      const response = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken.trim()}`
+        }
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        alert(`Authentication failed: ${data.error || 'Invalid API key'}`);
+        return;
+      }
+
+      // Server verified - enable admin mode client-side
+      const success = store.toggleAdminMode(authToken.trim());
+      if (success) {
+        setShowAuthPrompt(false);
+        setAuthToken('');
+      } else {
+        alert('Failed to enable admin mode');
+      }
+    } catch (error) {
+      alert('Authentication error: Unable to verify API key');
+      console.error('Auth error:', error);
+    }
+  };
 
   return (
     <>
@@ -37,7 +82,7 @@ export function WorldUI() {
         </div>
 
         <button
-          onClick={() => store.toggleAdminMode()}
+          onClick={handleAdminToggle}
           className={`mt-4 w-full py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
             adminMode 
               ? 'bg-purple-600 hover:bg-purple-700 text-white' 
@@ -116,6 +161,53 @@ export function WorldUI() {
         <p>📜 <b>Scroll</b> to zoom</p>
         {adminMode && <p className="text-purple-400 mt-1">👑 Admin: Use actions in agent modal</p>}
       </div>
+
+      {/* Admin Authentication Dialog */}
+      {showAuthPrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-purple-900/95 backdrop-blur-md text-white p-6 rounded-xl border border-purple-500/50 shadow-2xl max-w-sm w-full mx-4">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <span className="text-2xl">🔐</span> Admin Authentication Required
+            </h3>
+            <p className="text-sm text-gray-300 mb-4">
+              Admin mode requires a valid API key with admin permissions. Enter your key to continue.
+            </p>
+            
+            <input
+              type="password"
+              placeholder="Enter API key (rlm_...)"
+              value={authToken}
+              onChange={(e) => setAuthToken(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleAuthSubmit();
+                }
+              }}
+              className="w-full bg-purple-800/50 border border-purple-500 rounded px-3 py-2 text-sm text-white mb-4 placeholder-gray-500 focus:outline-none focus:border-purple-400"
+              autoFocus
+            />
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowAuthPrompt(false);
+                  setAuthToken('');
+                }}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAuthSubmit}
+                disabled={!authToken.trim()}
+                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-900 disabled:text-purple-400 text-white py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Unlock Admin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
