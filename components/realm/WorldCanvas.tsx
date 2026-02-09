@@ -82,6 +82,12 @@ export function WorldCanvas() {
   useEffect(() => {
     const POLL_INTERVAL = 3000; // 3 seconds
     
+    // Demo agent IDs that should persist even if not in API response
+    const demoAgentIds = new Set(['shalom', 'daily-kobold', 'trade-kobold']);
+    
+    // Track which agents are from the API (for cleanup on next poll)
+    let previousApiAgentIds = new Set<string>();
+    
     async function fetchAgents() {
       try {
         const response = await fetch('/api/agent/webhook');
@@ -91,6 +97,7 @@ export function WorldCanvas() {
         
         // Sync all agents from API to store
         const agentsFromAPI = data.all || [];
+        const currentApiAgentIds = new Set<string>();
         
         agentsFromAPI.forEach((apiAgent: {
           id: string;
@@ -102,6 +109,9 @@ export function WorldCanvas() {
           currentTask?: { id: string; name: string; type: string; progress: number };
           metadata?: { color?: string };
         }) => {
+          // Track that this agent came from the API in this poll
+          currentApiAgentIds.add(apiAgent.id);
+          
           // Handle Shalom (dragon) - special rendering
           if (apiAgent.id === 'shalom') {
             const shalom: Agent = {
@@ -164,6 +174,19 @@ export function WorldCanvas() {
           
           addAgent(agent);
         });
+        
+        // Clean up agents that were from API in previous poll but are no longer present
+        // We keep demo agents intact - they only get removed if explicitly coded
+        for (const agentId of previousApiAgentIds) {
+          if (!currentApiAgentIds.has(agentId) && !demoAgentIds.has(agentId)) {
+            // This agent was from the API before but is gone now, and it's not a demo agent
+            const { removeAgent } = useWorldStore.getState();
+            removeAgent(agentId);
+          }
+        }
+        
+        // Update the set of API agent IDs for next poll
+        previousApiAgentIds = currentApiAgentIds;
       } catch (e) {
         // Silently fail - world shows demo data if no connection
       }
