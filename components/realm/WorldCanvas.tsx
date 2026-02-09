@@ -12,35 +12,35 @@ export function WorldCanvas() {
   const { agents, islands, timeOfDay, addAgent } = useWorldStore();
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Initialize Shalom (the dragon) on mount
+  // Initialize default agents (will be overridden by API if agents report)
   useEffect(() => {
     if (!isLoaded) {
+      // Default Shalom (will be overridden if Shalom reports via API)
       const shalom: Agent = {
         id: 'shalom',
         name: 'Shalom',
         type: 'dragon',
         avatar: {
           color: '#6366f1',
-          scale: 2,
+          scale: 2.5,
           glowColor: '#ff6b35',
-          shape: 'dragon'
+          shape: 'slime'
         },
-        position: { x: 0, y: 3, z: 0 }, // On the ground plane now
+        position: { x: 0, y: 0.8, z: 0 },
         status: 'idle',
         joinedAt: new Date(),
         lastSeen: new Date()
       };
-      
       addAgent(shalom);
-      
-      // Add some sample kobolds for now (will read from state files later)
-      const kobolds: Agent[] = [
+
+      // Demo kobolds (will be overridden by real ones via API)
+      const demoKobolds: Agent[] = [
         {
           id: 'daily-kobold',
           name: 'Daily Kobold',
           type: 'kobold',
-          avatar: { color: '#22c55e', scale: 1, shape: 'kobold' },
-          position: { x: -25, y: 0.8, z: 12 }, // Standing on ground
+          avatar: { color: '#22c55e', scale: 1, shape: 'slime' },
+          position: { x: -35, y: 0.8, z: 15 }, // In Warrens zone
           status: 'working',
           currentTask: {
             id: 'task-1',
@@ -56,15 +56,21 @@ export function WorldCanvas() {
           id: 'trade-kobold',
           name: 'Trading Kobold',
           type: 'kobold',
-          avatar: { color: '#f97316', scale: 1, shape: 'kobold' },
-          position: { x: 20, y: 0.8, z: -8 }, // Standing on ground
-          status: 'traveling',
+          avatar: { color: '#f97316', scale: 1, shape: 'slime' },
+          position: { x: 35, y: 0.8, z: -15 }, // In Forge zone
+          status: 'working',
+          currentTask: {
+            id: 'task-2',
+            name: 'Analyzing trades',
+            type: 'trade',
+            progress: 40,
+            artifact: { id: 'art-2', type: 'coin', color: '#fbbf24', glowIntensity: 1 }
+          },
           joinedAt: new Date(),
           lastSeen: new Date()
         }
       ];
-      
-      kobolds.forEach(k => addAgent(k));
+      demoKobolds.forEach(k => addAgent(k));
       setIsLoaded(true);
     }
   }, [isLoaded, addAgent]);
@@ -76,6 +82,12 @@ export function WorldCanvas() {
   useEffect(() => {
     const POLL_INTERVAL = 3000; // 3 seconds
     
+    // Demo agent IDs that should persist even if not in API response
+    const demoAgentIds = new Set(['shalom', 'daily-kobold', 'trade-kobold']);
+    
+    // Track which agents are from the API (for cleanup on next poll)
+    let previousApiAgentIds = new Set<string>();
+    
     async function fetchAgents() {
       try {
         const response = await fetch('/api/agent/webhook');
@@ -85,6 +97,8 @@ export function WorldCanvas() {
         
         // Sync all agents from API to store
         const agentsFromAPI = data.all || [];
+        const currentApiAgentIds = new Set<string>();
+        
         agentsFromAPI.forEach((apiAgent: {
           id: string;
           name: string;
@@ -95,17 +109,43 @@ export function WorldCanvas() {
           currentTask?: { id: string; name: string; type: string; progress: number };
           metadata?: { color?: string };
         }) => {
-          // Skip if it's Shalom (the dragon) - we handle that separately
-          if (apiAgent.id === 'shalom' || apiAgent.type === 'dragon') return;
+          // Track that this agent came from the API in this poll
+          currentApiAgentIds.add(apiAgent.id);
+          
+          // Handle Shalom (dragon) - special rendering
+          if (apiAgent.id === 'shalom') {
+            const shalom: Agent = {
+              id: 'shalom',
+              name: apiAgent.name || 'Shalom',
+              type: 'dragon',
+              avatar: {
+                color: apiAgent.metadata?.color || '#6366f1',
+                scale: 2.5,
+                glowColor: '#ff6b35',
+                shape: 'slime'
+              },
+              position: apiAgent.position,
+              status: apiAgent.status,
+              currentTask: apiAgent.currentTask ? {
+                id: apiAgent.currentTask.id,
+                name: apiAgent.currentTask.name,
+                type: apiAgent.currentTask.type as 'code' | 'trade' | 'deploy' | 'write' | 'art' | 'meeting',
+                progress: apiAgent.currentTask.progress,
+                artifact: { id: `art-shalom`, type: 'crystal', color: '#fbbf24', glowIntensity: 1 }
+              } : undefined,
+              joinedAt: new Date(),
+              lastSeen: new Date()
+            };
+            addAgent(shalom);
+            return;
+          }
           
           const agent: Agent = {
             id: apiAgent.id,
             name: apiAgent.name,
-            // Map API types to frontend types
             type: apiAgent.type === 'subagent' ? 'subagent' : 
                   apiAgent.type === 'guest' ? 'guest' : 'kobold',
             avatar: { 
-              // Use metadata color, fall back to subtype defaults
               color: apiAgent.metadata?.color || 
                      (apiAgent.subtype === 'cmo' ? '#ec4899' :
                       apiAgent.subtype === 'cio' ? '#06b6d4' :
@@ -116,7 +156,7 @@ export function WorldCanvas() {
                       apiAgent.subtype === 'trading' ? '#f97316' :
                       apiAgent.subtype === 'deploy' ? '#3b82f6' :
                       '#22c55e'),
-              scale: apiAgent.type === 'subagent' ? 1.2 : 1, // Sub-agents slightly bigger
+              scale: apiAgent.type === 'subagent' ? 1.2 : 1,
               shape: 'slime'
             },
             position: apiAgent.position,
@@ -134,6 +174,19 @@ export function WorldCanvas() {
           
           addAgent(agent);
         });
+        
+        // Clean up agents that were from API in previous poll but are no longer present
+        // We keep demo agents intact - they only get removed if explicitly coded
+        for (const agentId of previousApiAgentIds) {
+          if (!currentApiAgentIds.has(agentId) && !demoAgentIds.has(agentId)) {
+            // This agent was from the API before but is gone now, and it's not a demo agent
+            const { removeAgent } = useWorldStore.getState();
+            removeAgent(agentId);
+          }
+        }
+        
+        // Update the set of API agent IDs for next poll
+        previousApiAgentIds = currentApiAgentIds;
       } catch (e) {
         // Silently fail - world shows demo data if no connection
       }
@@ -153,7 +206,7 @@ export function WorldCanvas() {
   return (
     <div className="w-full h-screen bg-slate-900">
       <Canvas
-        camera={{ position: [0, 40, 60], fov: 50 }} // Higher angle for ground plane view
+        camera={{ position: [0, 40, 60], fov: 50 }}
         dpr={[1, 2]}
         shadows
       >
@@ -206,8 +259,8 @@ export function WorldCanvas() {
           enableRotate={true}
           minDistance={15}
           maxDistance={120}
-          target={[0, 0, 0]} // Look at ground level
-          maxPolarAngle={Math.PI / 2 - 0.1} // Don't go below ground
+          target={[0, 0, 0]}
+          maxPolarAngle={Math.PI / 2 - 0.1}
         />
 
         {/* Fog for depth */}
