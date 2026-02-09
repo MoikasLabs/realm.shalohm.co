@@ -6,7 +6,7 @@ import { OrbitControls, Stars, Cloud, Sky } from '@react-three/drei';
 import { SlimeBlob } from '../agents/SlimeBlob';
 import { WorldPlane } from './WorldPlane';
 import { useWorldStore } from '@/lib/world/store';
-import { Agent, AgentType } from '@/types/agent';
+import { Agent } from '@/types/agent';
 
 export function WorldCanvas() {
   const { agents, islands, timeOfDay, addAgent } = useWorldStore();
@@ -71,6 +71,63 @@ export function WorldCanvas() {
 
   // Convert agents Map to array for rendering
   const agentsArray = Array.from(agents.values());
+
+  // Poll kobold webhook for live updates
+  useEffect(() => {
+    const POLL_INTERVAL = 3000; // 3 seconds
+    
+    async function fetchKobolds() {
+      try {
+        const response = await fetch('/api/kobold/webhook');
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        
+        // Sync kobolds from API to store
+        data.kobolds?.forEach((k: {
+          id: string;
+          name: string;
+          type: string;
+          status: 'idle' | 'working' | 'traveling' | 'error' | 'sleeping';
+          position: { x: number; y: number; z: number };
+          currentTask?: { id: string; name: string; type: string; progress: number };
+        }) => {
+          const agent: Agent = {
+            id: k.id,
+            name: k.name,
+            type: 'kobold',
+            avatar: { 
+              color: k.type === 'trading' ? '#f97316' : k.type === 'deploy' ? '#3b82f6' : '#22c55e',
+              scale: 1,
+              shape: 'slime'
+            },
+            position: k.position,
+            status: k.status,
+            currentTask: k.currentTask ? {
+              id: k.currentTask.id,
+              name: k.currentTask.name,
+              type: k.currentTask.type as 'code' | 'trade' | 'deploy' | 'write' | 'art' | 'meeting',
+              progress: k.currentTask.progress,
+              artifact: { id: `art-${k.id}`, type: 'crystal', color: '#fbbf24', glowIntensity: 0.8 }
+            } : undefined,
+            joinedAt: new Date(),
+            lastSeen: new Date()
+          };
+          
+          addAgent(agent);
+        });
+      } catch (e) {
+        // Silently fail - world shows demo data if no connection
+      }
+    }
+    
+    // Initial fetch
+    fetchKobolds();
+    
+    // Poll periodically
+    const interval = setInterval(fetchKobolds, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [addAgent]);
 
   // Determine sky based on time of day
   const isNight = timeOfDay < 6 || timeOfDay > 20;
