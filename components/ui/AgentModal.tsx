@@ -56,7 +56,7 @@ export function AgentModal() {
             <div>
               <h2 className="text-xl font-bold text-white">{agent.name}</h2>
               <p className="text-sm text-indigo-200">
-                {isDragon ? 'Dragon Overseer' : agent.subtype.toUpperCase()}
+                {isDragon ? 'Dragon Overseer' : (agent.subtype || 'Agent').toUpperCase()}
               </p>
             </div>
           </div>
