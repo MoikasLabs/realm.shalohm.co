@@ -4,14 +4,14 @@ import type { AgentState, AgentDelta, WorldDeltaUpdate } from '@/types/realtime'
 import fs from 'fs/promises';
 import path from 'path';
 
-// Extend NextApiResponse to include socket server
-interface NextApiResponseServerIO extends NextApiResponse {
+// Use intersection type to add socket.server.io without conflicting with NextApiResponse.socket
+type NextApiResponseServerIO = NextApiResponse & {
   socket: {
     server: {
       io?: SocketIOServer;
     };
   };
-}
+};
 
 // Global state management
 let io: SocketIOServer | null = null;
