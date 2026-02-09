@@ -1,4 +1,4 @@
-import { Building } from '@/types/agent';
+import { Building, Position } from '@/types/agent';
 
 export const BUILDINGS: Building[] = [
   {
@@ -144,7 +144,7 @@ export const BUILDINGS: Building[] = [
   {
     id: 'residences',
     name: 'Residences',
-    type: 'living',
+    type: 'residential',
     position: { x: -15, y: 0, z: 45 },
     size: { width: 20, depth: 16, height: 6 },
     color: '#14b8a6',
