@@ -17,41 +17,41 @@ const initialIslands: Island[] = [
   {
     id: 'perch',
     name: "Dragon's Perch",
-    position: { x: 0, y: 15, z: 0 },
+    position: { x: 0, y: 0, z: 0 }, // Center of the world
     type: 'central',
-    radius: 8,
+    radius: 12,
     color: '#6366f1'
   },
   {
     id: 'warrens',
     name: "The Warrens",
-    position: { x: -25, y: 2, z: 10 },
+    position: { x: -35, y: 0, z: 15 }, // Left side
     type: 'work',
-    radius: 6,
+    radius: 8,
     color: '#22c55e'
   },
   {
     id: 'forge',
     name: "The Forge",
-    position: { x: 25, y: 0, z: -10 },
+    position: { x: 35, y: 0, z: -15 }, // Right side
     type: 'work',
-    radius: 5,
+    radius: 7,
     color: '#f97316'
   },
   {
     id: 'plaza',
     name: "Gateway Plaza",
-    position: { x: 0, y: 0, z: 35 },
+    position: { x: 0, y: 0, z: 50 }, // Front/entrance
     type: 'portal',
-    radius: 7,
+    radius: 10,
     color: '#a855f7'
   },
   {
     id: 'market',
     name: "Market Mesa",
-    position: { x: 20, y: 5, z: 20 },
+    position: { x: 30, y: 0, z: 30 }, // Front-right
     type: 'meeting',
-    radius: 6,
+    radius: 9,
     color: '#eab308'
   }
 ];

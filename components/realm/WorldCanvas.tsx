@@ -5,7 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Stars, Cloud, Sky } from '@react-three/drei';
 import { DragonAvatar } from '../agents/DragonAvatar';
 import { KoboldAvatar } from '../agents/KoboldAvatar';
-import { FloatingIsland } from './FloatingIsland';
+import { WorldPlane } from './WorldPlane';
 import { useWorldStore } from '@/lib/world/store';
 import { Agent, AgentType } from '@/types/agent';
 
@@ -26,7 +26,7 @@ export function WorldCanvas() {
           glowColor: '#ff6b35',
           shape: 'dragon'
         },
-        position: { x: 0, y: 17, z: 0 },
+        position: { x: 0, y: 3, z: 0 }, // On the ground plane now
         status: 'idle',
         joinedAt: new Date(),
         lastSeen: new Date()
@@ -41,7 +41,7 @@ export function WorldCanvas() {
           name: 'Daily Kobold',
           type: 'kobold',
           avatar: { color: '#22c55e', scale: 1, shape: 'kobold' },
-          position: { x: -25, y: 4, z: 12 },
+          position: { x: -25, y: 0.8, z: 12 }, // Standing on ground
           status: 'working',
           currentTask: {
             id: 'task-1',
@@ -58,7 +58,7 @@ export function WorldCanvas() {
           name: 'Trading Kobold',
           type: 'kobold',
           avatar: { color: '#f97316', scale: 1, shape: 'kobold' },
-          position: { x: 20, y: 2, z: -8 },
+          position: { x: 20, y: 0.8, z: -8 }, // Standing on ground
           status: 'traveling',
           joinedAt: new Date(),
           lastSeen: new Date()
@@ -79,7 +79,7 @@ export function WorldCanvas() {
   return (
     <div className="w-full h-screen bg-slate-900">
       <Canvas
-        camera={{ position: [0, 25, 50], fov: 60 }}
+        camera={{ position: [0, 40, 60], fov: 50 }} // Higher angle for ground plane view
         dpr={[1, 2]}
         shadows
       >
@@ -117,10 +117,8 @@ export function WorldCanvas() {
           />
         )}
 
-        {/* Floating Islands */}
-        {islands.map((island) => (
-          <FloatingIsland key={island.id} island={island} />
-        ))}
+        {/* World Ground Plane with Zone Markers */}
+        <WorldPlane islands={islands} />
 
         {/* Agents */}
         {agentsArray.map((agent) => {
@@ -138,13 +136,14 @@ export function WorldCanvas() {
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
-          minDistance={10}
-          maxDistance={100}
-          target={[0, 10, 0]}
+          minDistance={15}
+          maxDistance={120}
+          target={[0, 0, 0]} // Look at ground level
+          maxPolarAngle={Math.PI / 2 - 0.1} // Don't go below ground
         />
 
         {/* Fog for depth */}
-        <fog attach="fog" args={[isNight ? '#0f172a' : '#e0e7ff', 30, 150]} />
+        <fog attach="fog" args={[isNight ? '#0f172a' : '#e2e8f0', 50, 180]} />
       </Canvas>
 
       {/* UI Overlay */}
