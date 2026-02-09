@@ -375,8 +375,8 @@ export function WorldMap2D() {
     selectZone(null);
   }, [screenToWorld, selectZone]);
 
-  // Wheel handler with passive:false to avoid warnings
-  const handleWheel = useCallback((e: WheelEvent) => {
+  // Wheel handler for zoom
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     updateViewportAction({ scale: Math.max(2, Math.min(50, viewportRef.current.scale * delta)) });
