@@ -2,25 +2,20 @@ import { Server as SocketIOServer } from 'socket.io';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { Server as HTTPServer } from 'http';
 import type { AgentState, AgentDelta, WorldDeltaUpdate } from '@/types/realtime';
-import fs from 'fs/promises';
-import path from 'path';
 
-// Interface that extends HTTP server and adds socket.io property
+// Types for Socket.IO server attachment
 interface ServerWithIO extends HTTPServer {
   io?: SocketIOServer;
 }
 
-// Use intersection type to add socket.server.io without conflicting with NextApiResponse.socket
 type NextApiResponseServerIO = NextApiResponse & {
   socket: {
     server: ServerWithIO;
   };
 };
 
-// Global state management
-let io: SocketIOServer | null = null;
+// In-memory agent cache (per-function-instance, cleared on cold start)
 const agentCache = new Map<string, AgentState>();
-const connectedClients = new Set<string>();
 
 // Zone centers for agent positioning
 const ZONE_CENTERS: Record<string, [number, number]> = {
@@ -31,7 +26,7 @@ const ZONE_CENTERS: Record<string, [number, number]> = {
   'townhall': [10, 10]
 };
 
-// Generate deterministic positions for agents
+// Generate deterministic position from ID and zone
 function generateAgentPosition(id: string, zoneId: string): { x: number; y: number } {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
@@ -49,11 +44,11 @@ function generateAgentPosition(id: string, zoneId: string): { x: number; y: numb
   return { x, y };
 }
 
-// Load kobold state and convert to agents
-async function loadAgentStates(): Promise<AgentState[]> {
+// Generate static agent states (no filesystem access for Vercel compatibility)
+function generateAgentStates(): AgentState[] {
   const agents: AgentState[] = [];
 
-  // Always include Shalom at center
+  // Shalom at center
   agents.push({
     id: 'shalom',
     name: 'Shalom',
@@ -65,97 +60,47 @@ async function loadAgentStates(): Promise<AgentState[]> {
     lastUpdate: Date.now()
   });
 
-  try {
-    const koboldStatePath = path.join('/root/.openclaw/workspace/kobolds', 'daily-kobold-state.json');
-    let koboldIds: string[] = [];
+  // Default kobolds (hardcoded for Vercel serverless - no FS access)
+  const koboldIds = ['daily-kobold', 'trade-kobold'];
 
-    try {
-      const stateData = await fs.readFile(koboldStatePath, 'utf-8');
-      const state = JSON.parse(stateData);
-      if (state.activeKobolds) {
-        koboldIds = state.activeKobolds;
-      }
-    } catch {
-      koboldIds = ['daily-kobold', 'trade-kobold'];
-    }
+  for (let i = 0; i < koboldIds.length; i++) {
+    const id = koboldIds[i];
+    const isTrading = id.includes('trade') || i % 2 === 1;
+    const zoneId = isTrading ? 'forge' : 'warrens';
 
-    for (let i = 0; i < koboldIds.length; i++) {
-      const id = koboldIds[i];
-      const isTrading = id.includes('trade') || i % 2 === 1;
-      const zoneId = isTrading ? 'forge' : 'warrens';
-
-      agents.push({
-        id,
-        name: id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        type: isTrading ? 'trading' : 'daily',
-        status: 'active',
-        position: generateAgentPosition(id, zoneId),
-        color: isTrading ? '#f97316' : '#22c55e',
-        radius: 4,
-        lastUpdate: Date.now()
-      });
-    }
-  } catch (error) {
-    console.error('[Socket.IO] Error loading agents:', error);
+    agents.push({
+      id,
+      name: id.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      type: isTrading ? 'trading' : 'daily',
+      status: 'active',
+      position: generateAgentPosition(id, zoneId),
+      color: isTrading ? '#f97316' : '#22c55e',
+      radius: 4,
+      lastUpdate: Date.now()
+    });
   }
 
   return agents;
 }
 
-// Calculate delta between old and new state
-function calculateDelta(
-  oldAgents: Map<string, AgentState>,
-  newAgents: AgentState[]
-): WorldDeltaUpdate {
-  const deltas: AgentDelta[] = [];
-  const removed: string[] = [];
-
-  for (const agent of newAgents) {
-    const old = oldAgents.get(agent.id);
-
-    if (!old) {
-      deltas.push({
-        id: agent.id,
-        position: agent.position,
-        status: agent.status,
-        timestamp: agent.lastUpdate
-      });
-    } else {
-      const delta: AgentDelta = { id: agent.id, timestamp: agent.lastUpdate };
-      let hasChanges = false;
-
-      if (old.position.x !== agent.position.x || old.position.y !== agent.position.y) {
-        delta.position = agent.position;
-        hasChanges = true;
-      }
-
-      if (old.status !== agent.status) {
-        delta.status = agent.status;
-        hasChanges = true;
-      }
-
-      if (hasChanges) {
-        deltas.push(delta);
-      }
-    }
-
+// Simple broadcast - no setInterval (not reliable in serverless)
+function broadcastInitialState(io: SocketIOServer, socketId: string) {
+  const agents = generateAgentStates();
+  
+  // Update cache
+  for (const agent of agents) {
     agentCache.set(agent.id, agent);
   }
 
-  const newIds = new Set(newAgents.map(a => a.id));
-  for (const [id] of oldAgents) {
-    if (!newIds.has(id)) {
-      removed.push(id);
-      agentCache.delete(id);
-    }
+  // Send to the specific socket that connected
+  const socket = io.sockets.sockets.get(socketId);
+  if (socket) {
+    socket.emit('full', {
+      type: 'full',
+      timestamp: Date.now(),
+      fullState: agents
+    } as WorldDeltaUpdate);
   }
-
-  return {
-    type: 'delta',
-    timestamp: Date.now(),
-    agents: deltas,
-    removed
-  };
 }
 
 // Initialize Socket.IO handlers
@@ -163,32 +108,26 @@ function setupSocketHandlers(ioInstance: SocketIOServer) {
   ioInstance.on('connection', (socket) => {
     const clientId = socket.id;
     const transport = socket.conn.transport.name;
-    connectedClients.add(clientId);
-    console.log(`[Socket.IO] Client connected: ${clientId} (transport: ${transport}, total: ${connectedClients.size})`);
+    
+    console.log(`[Socket.IO] Client connected: ${clientId} (transport: ${transport})`);
 
-    // Send initial full state
-    loadAgentStates().then(agents => {
-      for (const agent of agents) {
-        agentCache.set(agent.id, { ...agent });
-      }
+    // Send initial state immediately
+    broadcastInitialState(ioInstance, clientId);
 
-      socket.emit('full', {
-        type: 'full',
-        timestamp: Date.now(),
-        fullState: agents
-      } as WorldDeltaUpdate);
-    });
-
+    // Handle transport upgrade
     socket.conn.on('upgrade', (transport) => {
       console.log(`[Socket.IO] Client ${clientId} upgraded to ${transport.name}`);
     });
 
-    socket.on('viewport', (viewport) => {
-      (socket as unknown as { viewport?: unknown }).viewport = viewport;
-    });
-
+    // Ping/pong for connection health
     socket.on('ping', () => {
       socket.emit('pong', { timestamp: Date.now() });
+    });
+
+    // Subscribe to viewport updates
+    socket.on('viewport', (viewport) => {
+      (socket as unknown as { viewport?: unknown }).viewport = viewport;
+      console.log(`[Socket.IO] Client ${clientId} viewport updated`);
     });
 
     socket.on('subscribe', (data) => {
@@ -196,33 +135,13 @@ function setupSocketHandlers(ioInstance: SocketIOServer) {
     });
 
     socket.on('disconnect', (reason) => {
-      connectedClients.delete(clientId);
-      console.log(`[Socket.IO] Client disconnected: ${clientId} (reason: ${reason}, ${connectedClients.size} remaining)`);
+      console.log(`[Socket.IO] Client disconnected: ${clientId} (reason: ${reason})`);
     });
 
     socket.on('error', (err) => {
       console.error(`[Socket.IO] Client ${clientId} error:`, err);
     });
   });
-
-  // Periodic updates (20 updates/sec)
-  let lastBroadcast = Date.now();
-  const BROADCAST_INTERVAL = 50;
-
-  setInterval(async () => {
-    if (connectedClients.size === 0) return;
-
-    const now = Date.now();
-    if (now - lastBroadcast < BROADCAST_INTERVAL) return;
-    lastBroadcast = now;
-
-    const newAgents = await loadAgentStates();
-    const delta = calculateDelta(agentCache, newAgents);
-
-    if (delta.agents && delta.agents.length > 0) {
-      ioInstance.emit('delta', delta);
-    }
-  }, 50);
 }
 
 // Main handler
@@ -230,7 +149,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponseServerIO
 ) {
-  // CORS headers for Vercel preview deployments
+  // CORS headers for all requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -240,29 +159,45 @@ export default async function handler(
     return;
   }
 
-  // Initialize Socket.IO if not already done
+  // Handle Socket.IO upgrade
   if (!res.socket.server.io) {
-    const ioInstance = new SocketIOServer(res.socket.server, {
-      path: '/api/socket',
-      cors: {
-        origin: '*',
-        methods: ['GET', 'POST'],
-        credentials: false
-      },
-      transports: ['polling', 'websocket'],
-      pingInterval: 10000,
-      pingTimeout: 5000,
-      allowUpgrades: true,
-      perMessageDeflate: false,
-      maxHttpBufferSize: 1e6
-    });
+    try {
+      const ioInstance = new SocketIOServer(res.socket.server, {
+        path: '/api/socket',
+        cors: {
+          origin: '*',
+          methods: ['GET', 'POST'],
+          credentials: false
+        },
+        transports: ['polling', 'websocket'],
+        pingInterval: 10000,
+        pingTimeout: 5000,
+        allowUpgrades: true,
+        perMessageDeflate: false,
+        maxHttpBufferSize: 1e6,
+        // Vercel-specific: clean up on connection close
+        cleanupEmptyChildNamespaces: true
+      });
 
-    res.socket.server.io = ioInstance;
-    io = ioInstance;
-    
-    setupSocketHandlers(ioInstance);
-    console.log('[Socket.IO] Server initialized on /api/socket');
+      res.socket.server.io = ioInstance;
+      
+      setupSocketHandlers(ioInstance);
+      console.log('[Socket.IO] Server initialized on /api/socket');
+    } catch (err) {
+      console.error('[Socket.IO] Failed to initialize:', err);
+      res.status(500).json({ error: 'Socket.IO initialization failed' });
+      return;
+    }
   }
 
+  // End the response to let Socket.IO handle the connection
   res.end();
 }
+
+// Vercel config - prevent function from timing out too quickly
+export const config = {
+  api: {
+    bodyParser: false, // Socket.IO handles its own body parsing
+    externalResolver: true, // Let Socket.IO handle the response
+  }
+};
