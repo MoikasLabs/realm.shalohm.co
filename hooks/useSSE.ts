@@ -243,9 +243,11 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
  * });
  * ```
  */
+import type { WorldDeltaUpdate } from '@/types/realtime';
+
 export function useRealmSSE(options: {
   onFullState?: (agents: AgentState[]) => void;
-  onDeltaUpdate?: (update: SSEMessage) => void;
+  onDeltaUpdate?: (update: WorldDeltaUpdate) => void;
   onPing?: (latency: number) => void;
 } = {}) {
   const { onFullState, onDeltaUpdate, onPing } = options;
@@ -255,7 +257,10 @@ export function useRealmSSE(options: {
     autoReconnect: true,
     onFullState,
     onDeltaUpdate: (update) => {
-      onDeltaUpdate?.(update);
+      // Only pass 'delta' and 'full' messages, not 'error' or 'ping'
+      if (update.type === 'delta' || update.type === 'full') {
+        onDeltaUpdate?.(update as WorldDeltaUpdate);
+      }
     },
     onMessage: (data) => {
       if (data.type === 'ping' && data.timestamp) {
@@ -304,6 +309,11 @@ export function useAgentUpdatesSSE(options: {
   }, [onFullState]);
 
   const handleDeltaUpdate = useCallback((update: SSEMessage) => {
+    // Only process valid update types (not 'error' or 'ping')
+    if (update.type !== 'delta' && update.type !== 'full') {
+      return;
+    }
+
     // Update interpolated positions
     if (update.agents) {
       update.agents.forEach((delta) => {
