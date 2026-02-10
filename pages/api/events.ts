@@ -19,11 +19,10 @@ const AGENT_CONFIGS = [
   {
     id: 'shalom',
     name: 'Shalom',
-    type: 'shalom',
-    status: 'active',
+    type: 'shalom' as const,
+    status: 'active' as const,
     color: '#6366f1',
     radius: 6,
-    // Lissajous figure pattern (complex orbital motion)
     baseX: 0,
     baseY: 0,
     amplitudeX: 40,
@@ -36,11 +35,10 @@ const AGENT_CONFIGS = [
   {
     id: 'daily-kobold',
     name: 'Daily Kobold',
-    type: 'daily',
-    status: 'active',
+    type: 'daily' as const,
+    status: 'active' as const,
     color: '#22c55e',
     radius: 4,
-    // Circular orbit with wobble
     baseX: -25,
     baseY: 15,
     amplitudeX: 20,
@@ -53,11 +51,10 @@ const AGENT_CONFIGS = [
   {
     id: 'trade-kobold',
     name: 'Trade Kobold',
-    type: 'trading',
-    status: 'active',
+    type: 'trading' as const,
+    status: 'active' as const,
     color: '#f97316',
     radius: 4,
-    // Figure-8 pattern (infinity symbol)
     baseX: 25,
     baseY: -15,
     amplitudeX: 30,
@@ -71,6 +68,7 @@ const AGENT_CONFIGS = [
 
 // Generate deterministic movement based on timestamp
 // Each agent follows a unique mathematical pattern for visual interest
+// Generate deterministic movement based on timestamp
 function generateAgentPositions(seedTime: number): AgentState[] {
   const time = seedTime / 1000; // Convert to seconds for smoother movement
 

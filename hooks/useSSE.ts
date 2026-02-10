@@ -241,16 +241,37 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
 import type { WorldDeltaUpdate } from '@/types/realtime';
 
 export function useRealmSSE(options: {
-  onFullState?: (agents: AgentState[]) => void;
+  onFullState?: (agents: AgentState[], lastPositions?: Map<string, { x: number; y: number }>) => void;
   onDeltaUpdate?: (update: WorldDeltaUpdate) => void;
   onPing?: (latency: number) => void;
+  onDisconnect?: () => void;
 } = {}) {
-  const { onFullState, onDeltaUpdate, onPing } = options;
+  const { onFullState, onDeltaUpdate, onPing, onDisconnect } = options;
+
+  // Position memory for smooth reconnection - prevents agent jumps on SSE reconnect
+  // This ref persists across hook re-renders and survives disconnection
+  const lastPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const wasConnectedRef = useRef(false);
 
   return useSSE({
     autoConnect: true,
     autoReconnect: true,
-    onFullState,
+    onFullState: (agents) => {
+      // Check if we have stored positions (reconnect scenario)
+      const hasStoredPositions = lastPositionsRef.current.size > 0;
+      const isReconnect = wasConnectedRef.current && hasStoredPositions;
+      
+      if (isReconnect) {
+        // This is a reconnect - use stored positions as interpolation start points
+        console.log('[useRealmSSE] Reconnect detected, using saved positions for', lastPositionsRef.current.size, 'agents');
+        onFullState?.(agents, lastPositionsRef.current);
+        // Clear stored positions after using them
+        lastPositionsRef.current.clear();
+      } else {
+        // First connection - no stored positions needed
+        onFullState?.(agents);
+      }
+    },
     onDeltaUpdate: (update) => {
       // Only pass 'delta' and 'full' messages, not 'error' or 'ping'
       if (update.type === 'delta' || update.type === 'full') {
@@ -260,12 +281,85 @@ export function useRealmSSE(options: {
     onMessage: (data) => {
       if (data.type === 'ping' && data.timestamp) {
         onPing?.(Date.now() - data.timestamp);
+        // Mark as connected after receiving a ping
+        wasConnectedRef.current = true;
       }
+    },
+    onDisconnect: () => {
+      console.log('[useRealmSSE] Disconnected, expecting' + (wasConnectedRef.current ? ' reconnect' : ' first connection'));
+      onDisconnect?.();
     },
   });
 }
 
 /**
+ * Hook for saving and retrieving position data for smooth reconnection
+ * 
+ * Call saveCurrentPositions(positions) from your component's onDisconnect
+ * to preserve agent positions before SSE reconnects.
+ */
+export function usePositionSaver() {
+  const lastPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  const savePositions = useCallback((positions: Map<string, { x: number; y: number }>) => {
+    positions.forEach((pos, id) => {
+      lastPositionsRef.current.set(id, { ...pos });
+    });
+    console.log('[usePositionSaver] Saved positions for', positions.size, 'agents');
+  }, []);
+
+  const getPositions = useCallback(() => {
+    return lastPositionsRef.current;
+  }, []);
+
+  const clearPositions = useCallback(() => {
+    console.log('[usePositionSaver] Clearing saved positions');
+    lastPositionsRef.current.clear();
+  }, []);
+
+  return {
+    savePositions,
+    getPositions,
+    clearPositions,
+  };
+}
+
+/**
+ * Hook to capture and store agent positions for smooth reconnection.
+ * Call this from your component to save positions before disconnect.
+ */
+export function usePositionMemory() {
+  const lastPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  
+  const savePositions = useCallback((positions: Map<string, { x: number; y: number }>) => {
+    positions.forEach((pos, id) => {
+      lastPositionsRef.current.set(id, { ...pos });
+    });
+    console.log('[usePositionMemory] Saved positions for', positions.size, 'agents');
+  }, []);
+
+  const getSavedPositions = useCallback(() => {
+    return lastPositionsRef.current;
+  }, []);
+
+  const clearSavedPositions = useCallback(() => {
+    lastPositionsRef.current.clear();
+  }, []);
+
+  return {
+    savePositions,
+    getSavedPositions,
+    clearSavedPositions,
+    lastPositionsRef,
+  };
+}
+
+/**
+ * Hook with client-side position memory to prevent agent jumps on SSE reconnect.
+ * 
+ * When Vercel times out (10s), SSE reconnects, and this remembers agent positions
+ * to smoothly interpolate from where they were instead of jumping to server positions.
+ * 
  * Legacy compatibility hook - provides same API as useAgentUpdates
  * but uses SSE instead of Socket.IO
  */
@@ -287,18 +381,53 @@ export function useAgentUpdatesSSE(options: {
     >
   >(new Map());
 
+  // Store last known positions before disconnect for smooth reconnection
+  const lastPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const wasConnectedRef = useRef(false);
+
   const handleFullState = useCallback((agents: AgentState[]) => {
     const now = performance.now();
+    const isReconnect = wasConnectedRef.current && lastPositionsRef.current.size > 0;
     
     // Initialize interpolated positions
     agents.forEach((agent: AgentState) => {
-      interpolatedPositionsRef.current.set(agent.id, {
-        current: { ...agent.position },
-        target: agent.targetPosition || { ...agent.position },
-        startTime: now,
-        duration: 100, // INTERPOLATION_DURATION
-      });
+      if (isReconnect) {
+        // On reconnect: Use last known position as start, server position as target
+        // This prevents agents from "jumping" when SSE reconnects after timeout
+        const lastPos = lastPositionsRef.current.get(agent.id);
+        
+        if (lastPos) {
+          interpolatedPositionsRef.current.set(agent.id, {
+            current: { ...lastPos },
+            target: agent.position,
+            startTime: now,
+            duration: 500, // Smooth over 500ms on reconnect
+          });
+          console.log(`[useAgentUpdatesSSE] Reconnect: agent ${agent.id} interpolating from`, lastPos, 'to', agent.position);
+        } else {
+          // Agent not seen before disconnect, normal init
+          interpolatedPositionsRef.current.set(agent.id, {
+            current: { ...agent.position },
+            target: agent.targetPosition || { ...agent.position },
+            startTime: now,
+            duration: 100,
+          });
+        }
+      } else {
+        // First connect: Normal initialization
+        interpolatedPositionsRef.current.set(agent.id, {
+          current: { ...agent.position },
+          target: agent.targetPosition || { ...agent.position },
+          startTime: now,
+          duration: 100, // INTERPOLATION_DURATION
+        });
+      }
     });
+
+    // Clear saved positions after using them
+    if (isReconnect) {
+      lastPositionsRef.current.clear();
+    }
 
     onFullState?.(agents);
   }, [onFullState]);
@@ -338,6 +467,18 @@ export function useAgentUpdatesSSE(options: {
   const sse = useRealmSSE({
     onFullState: handleFullState,
     onDeltaUpdate: handleDeltaUpdate,
+    onPing: (latency) => {
+      // Track connection state
+      wasConnectedRef.current = true;
+    },
+    onDisconnect: () => {
+      // Save all current positions before disconnect
+      console.log('[useAgentUpdatesSSE] Disconnect: Saving positions...');
+      interpolatedPositionsRef.current.forEach((pos, id) => {
+        lastPositionsRef.current.set(id, { ...pos.current });
+      });
+      console.log('[useAgentUpdatesSSE] Saved positions for', lastPositionsRef.current.size, 'agents');
+    },
   });
 
   return {

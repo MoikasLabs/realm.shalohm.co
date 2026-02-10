@@ -12,7 +12,7 @@ import {
   useRealtimeStore
 } from '@/lib/store/realtimeStore';
 import type { AgentState } from '@/types/realtime';
-import { useRealmSSE } from '@/hooks/useSSE';
+import { useRealmSSE, usePositionMemory } from '@/hooks/useSSE';
 
 
 // Performance constants
@@ -40,6 +40,9 @@ export function WorldMap2D() {
   
   // Sync latency to ref for non-reactive render loop
   useEffect(() => { sseLatencyRef.current = sseLatency; }, [sseLatency]);
+
+  // Position memory for smooth reconnection (prevents agent jumps on SSE reconnect)
+  const { savePositions, getSavedPositions, clearSavedPositions } = usePositionMemory();
   
   const selectedZone = useSelectedZone();
   const hoveredZone = useHoveredZone();
@@ -185,7 +188,10 @@ export function WorldMap2D() {
 
   // SSE connection for real-time updates
   const { isConnected: sseConnected } = useRealmSSE({
-    onFullState: (agents) => {
+    onFullState: (agents, lastPositions) => {
+      // Check if this is a reconnect with saved positions
+      const isReconnect = lastPositions && lastPositions.size > 0;
+      
       // Update store with full state
       applyDeltaUpdate({
         type: 'full',
@@ -196,12 +202,26 @@ export function WorldMap2D() {
       // Initialize interpolated positions
       const now = performance.now();
       agents.forEach((agent) => {
-        interpolatedPositionsRef.current.set(agent.id, {
-          current: { ...agent.position },
-          target: agent.targetPosition || { ...agent.position },
-          startTime: now,
-          duration: 100, // INTERPOLATION_DURATION
-        });
+        const savedPos = lastPositions?.get(agent.id);
+        
+        if (savedPos && isReconnect) {
+          // Reconnect: Use saved position as start, server position as target
+          // This prevents agents from "jumping" when SSE reconnects after Vercel timeout
+          interpolatedPositionsRef.current.set(agent.id, {
+            current: { ...savedPos },
+            target: agent.position,
+            startTime: now,
+            duration: 500, // Smooth over 500ms on reconnect
+          });
+        } else {
+          // First connect: Normal initialization
+          interpolatedPositionsRef.current.set(agent.id, {
+            current: { ...agent.position },
+            target: agent.targetPosition || { ...agent.position },
+            startTime: now,
+            duration: 100, // INTERPOLATION_DURATION
+          });
+        }
       });
     },
     onDeltaUpdate: (update) => {
@@ -236,6 +256,16 @@ export function WorldMap2D() {
     onPing: (latencyMs) => {
       setSseLatency(latencyMs);
       updatePing(latencyMs);
+    },
+    onDisconnect: () => {
+      // Save current interpolated positions before disconnect
+      // This allows smooth reconnection without agent jumps
+      const positionsToSave = new Map<string, { x: number; y: number }>();
+      interpolatedPositionsRef.current.forEach((pos, id) => {
+        positionsToSave.set(id, { ...pos.current });
+      });
+      savePositions(positionsToSave);
+      console.log('[WorldMap2D] Saved positions for', positionsToSave.size, 'agents before disconnect');
     },
   });
 
