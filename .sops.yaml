@@ -1,0 +1,5 @@
+# SOPS configuration for Shalom Realm secrets
+# Creation rules determine which keys are used for encryption
+creation_rules:
+  - age: age1psazt2sh4kvxjmutvlhzawxclvpzu4l48y50x95n7n85ylkrdedq7nhmcq
+    path_regex: secrets/.*\.json$
