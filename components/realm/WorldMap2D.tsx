@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { 
   useAgents, 
   useMetrics, 
@@ -12,8 +12,7 @@ import {
   useRealtimeStore
 } from '@/lib/store/realtimeStore';
 import type { AgentState } from '@/types/realtime';
-import { useSocket } from '@/hooks/useSocket';
-import { useAgentUpdates } from '@/hooks/useAgentUpdates';
+import { useRealmSSE } from '@/hooks/useSSE';
 
 
 // Performance constants
@@ -34,6 +33,14 @@ export function WorldMap2D() {
   const viewport = useViewport();
   const metrics = useMetrics();
   const isConnected = useConnectionState();
+  
+  // SSE latency (from hook)
+  const [sseLatency, setSseLatency] = useState(0);
+  const sseLatencyRef = useRef(0);
+  
+  // Sync latency to ref for non-reactive render loop
+  useEffect(() => { sseLatencyRef.current = sseLatency; }, [sseLatency]);
+  
   const selectedZone = useSelectedZone();
   const hoveredZone = useHoveredZone();
   
@@ -176,18 +183,66 @@ export function WorldMap2D() {
     interpolatedCountRef.current = interpolatedCount;
   }, [isAgentVisible, worldToScreen, hoveredZone, getAgentZone]);
 
-  // Socket.IO connection using reusable hook
-  const { socket, isConnected: socketConnected } = useSocket({
-    // No custom callbacks – we will handle events via useAgentUpdates hook
+  // SSE connection for real-time updates
+  const { isConnected: sseConnected } = useRealmSSE({
+    onFullState: (agents) => {
+      // Update store with full state
+      applyDeltaUpdate({
+        type: 'full',
+        timestamp: Date.now(),
+        fullState: agents
+      });
+      
+      // Initialize interpolated positions
+      const now = performance.now();
+      agents.forEach((agent) => {
+        interpolatedPositionsRef.current.set(agent.id, {
+          current: { ...agent.position },
+          target: agent.targetPosition || { ...agent.position },
+          startTime: now,
+          duration: 100, // INTERPOLATION_DURATION
+        });
+      });
+    },
+    onDeltaUpdate: (update) => {
+      // Update interpolated positions
+      if (update.agents) {
+        update.agents.forEach((delta) => {
+          if (delta.id && delta.position) {
+            const current = interpolatedPositionsRef.current.get(delta.id);
+            const agentsMap = useRealtimeStore.getState().agents;
+            const existing = agentsMap.get(delta.id);
+            
+            if (current) {
+              current.current = { ...current.target };
+              current.target = delta.position;
+              current.startTime = performance.now();
+              current.duration = 100;
+            } else if (existing) {
+              interpolatedPositionsRef.current.set(delta.id, {
+                current: { ...existing.position },
+                target: delta.position,
+                startTime: performance.now(),
+                duration: 100,
+              });
+            }
+          }
+        });
+      }
+      
+      // Apply to store
+      applyDeltaUpdate(update);
+    },
+    onPing: (latencyMs) => {
+      setSseLatency(latencyMs);
+      updatePing(latencyMs);
+    },
   });
 
-  // Sync store connection state with socket hook
+  // Sync store connection state with SSE status
   useEffect(() => {
-    setConnectionState(socketConnected);
-  }, [socketConnected]);
-
-  // Subscribe to Socket.IO events and update store
-  useAgentUpdates({ socket, isConnected: socketConnected });
+    setConnectionState(sseConnected);
+  }, [sseConnected, setConnectionState]);
 
   // ======= RENDER LOOP - 60fps OUTSIDE REACT =======
   useEffect(() => {
@@ -213,7 +268,7 @@ export function WorldMap2D() {
           renderTime: renderTimeRef.current,
           visibleAgents: visibleCountRef.current,
           interpolatedAgents: interpolatedCountRef.current,
-          wsLatency: store.wsLatency
+          wsLatency: sseLatencyRef.current
         });
         lastMetricsPushRef.current = timestamp;
       }
@@ -424,7 +479,7 @@ export function WorldMap2D() {
           <p className="text-slate-400">Connection: <span className={`w-2 h-2 rounded-full inline-block ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} /> {isConnected ? 'Live' : 'Disconnected'}</p>
           <p className="text-slate-400">Agents: {agents.size}</p>
           <p className="text-slate-400">FPS: {Math.round(metrics.fps) || '--'}</p>
-          <p className="text-slate-400">Latency: {metrics.wsLatency}ms</p>
+          <p className="text-slate-400">Latency: {sseLatency}ms</p>
         </div>
         <div className="mt-3 space-y-1 max-h-40 overflow-y-auto">
           {agentList.map(agent => (
