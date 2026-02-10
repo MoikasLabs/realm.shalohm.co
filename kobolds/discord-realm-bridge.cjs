@@ -69,6 +69,8 @@ const server = http.createServer((req, res) => {
             ok: true,
             connected: shalom.ws?.readyState === WebSocket.OPEN,
             location: shalom.currentLocation,
+            inCave: shalom.inCave,
+            onlineStatus: shalom.onlineStatus,  // 'online', 'busy', 'away'
             processing: shalom.isProcessing
           }));
           break;

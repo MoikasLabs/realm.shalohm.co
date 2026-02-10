@@ -186,9 +186,9 @@ const server = http.createServer((req, res) => {
               id,
               name: client.name,
               connected: client.ws?.readyState === 1,
-              position: client.position,
-              isWorking: client.isWorking,
-              zone: client.currentZone
+              inCave: client.inCave,
+              onlineStatus: client.inCave ? 'idle' : 'active',
+              position: client.position
             }))
           }));
           break;

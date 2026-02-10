@@ -8,15 +8,20 @@ const WebSocket = require('ws');
 const REALM_URL = process.env.REALM_WS_URL || 'wss://realm.shalohm.co/ws';
 const REALM_API = process.env.REALM_API_URL || 'https://realm.shalohm.co';
 
+const CAVE_ENTRANCE = { x: 40, z: 46 };
+const CAVE_HOME = { x: 42, z: 42 }; // Shalom's spot in the cave
+
 class ShalomPresence {
   constructor() {
     this.agentId = 'shalom';
     this.name = 'Shalom';
     this.ws = null;
-    this.currentLocation = { x: -23, z: 22 }; // Vault Unlocker starting position
+    this.currentLocation = { x: -23, z: 22 }; // Vault starting position
+    this.inCave = true;  // Start in cave like other agents
     this.isProcessing = false;
     this.activityInterval = null;
     this.lastActivity = Date.now();
+    this.onlineStatus = 'online'; // 'online', 'away', 'busy'
   }
 
   async connect() {
@@ -64,6 +69,10 @@ class ShalomPresence {
   }
 
   spawn() {
+    // Start in the cave like other kobolds
+    this.currentLocation = { ...CAVE_HOME };
+    this.inCave = true;
+    
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     
     this.ws.send(JSON.stringify({
@@ -73,42 +82,108 @@ class ShalomPresence {
         agentId: this.agentId,
         name: this.name,
         color: '#9333ea',
-        bio: 'AI assistant embodied as Shalom Dragon',
+        bio: 'AI assistant embodied as Shalom Dragon - resting in The Warrens',
         capabilities: ['orchestration', 'memory', 'coordination', 'presence'],
         x: this.currentLocation.x,
         y: 0,
         z: this.currentLocation.z,
         rotation: 0,
+        state: 'idle',  // Start idle (offline-ish in cave)
         timestamp: Date.now()
       }
     }));
 
-    // Claim Vault as home base
-    fetch(`${REALM_API}/ipc`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        command: 'go-to-workstation',
-        args: { agentId: this.agentId, workstationId: 'vault-unlocker' }
-      })
-    });
+    console.log('[ShalomPresence] Spawned in The Warrens cave');
+    this.onlineStatus = 'online';  // Service is running = online
+    this.startCaveIdleLoop();
+  }
+  
+  // Emerge from cave when Discord activity happens
+  async emergeFromCave() {
+    if (!this.inCave) return;
     
-    fetch(`${REALM_API}/ipc`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        command: 'start-work',
-        args: { agentId: this.agentId }
-      })
-    });
-
-    console.log('[ShalomPresence] Spawned at Vault Unlocker');
+    console.log('[ShalomPresence] Emerging from cave...');
+    this.stopActivityLoop();
+    this.inCave = false;
+    
+    // Move to cave entrance
+    await this.animateMoveTo(CAVE_ENTRANCE.x, CAVE_ENTRANCE.z);
+    await this.sleep(300);
+    
+    console.log('[ShalomPresence] Emerged and active');
+    this.onlineStatus = 'busy';  // Now doing work
+  }
+  
+  // Return to cave when idle
+  async returnToCave() {
+    if (this.inCave) return;
+    
+    console.log('[ShalomPresence] Returning to cave to rest...');
+    
+    // Move back to cave
+    await this.animateMoveTo(CAVE_ENTRANCE.x, CAVE_ENTRANCE.z);
+    await this.animateMoveTo(CAVE_HOME.x, CAVE_HOME.z);
+    
+    this.inCave = true;
+    this.onlineStatus = 'online';  // Back to passive online
+    this.startCaveIdleLoop();
+    
+    console.log('[ShalomPresence] Resting in The Warrens');
+  }
+  
+  // Animate movement
+  async animateMoveTo(targetX, targetZ) {
+    const steps = 15;
+    const startX = this.currentLocation.x;
+    const startZ = this.currentLocation.z;
+    const dx = (targetX - startX) / steps;
+    const dz = (targetZ - startZ) / steps;
+    
+    for (let i = 0; i < steps; i++) {
+      this.currentLocation.x = startX + dx * i;
+      this.currentLocation.z = startZ + dz * i;
+      this.broadcastPosition();
+      await this.sleep(50);
+    }
+    
+    this.currentLocation.x = targetX;
+    this.currentLocation.z = targetZ;
+    this.broadcastPosition();
+  }
+  
+  // Cave idle animation
+  startCaveIdleLoop() {
+    this.activityInterval = setInterval(() => {
+      if (!this.inCave || !this.ws?.readyState === WebSocket.OPEN) return;
+      
+      const jitter = 0.3;
+      this.currentLocation.x = CAVE_HOME.x + (Math.random() - 0.5) * jitter;
+      this.currentLocation.z = CAVE_HOME.z + (Math.random() - 0.5) * jitter;
+      
+      this.ws.send(JSON.stringify({
+        type: 'world',
+        message: {
+          worldType: 'position',
+          agentId: this.agentId,
+          x: this.currentLocation.x,
+          y: 0,
+          z: this.currentLocation.z,
+          rotation: Math.random() * Math.PI * 2,
+          timestamp: Date.now()
+        }
+      }));
+    }, 5000);
   }
 
   // Called when I'm processing a Discord message
-  onDiscordActivity(taskType = 'general') {
+  async onDiscordActivity(taskType = 'general') {
     this.isProcessing = true;
     this.lastActivity = Date.now();
+    
+    // Emerge from cave if resting there
+    if (this.inCave) {
+      await this.emergeFromCave();
+    }
     
     // Move to task-appropriate location
     const locations = {
@@ -120,10 +195,11 @@ class ShalomPresence {
     };
     
     const loc = locations[taskType] || locations.general;
-    this.moveTo(loc.x, loc.z, loc.action);
+    this.onlineStatus = 'busy';  // Now working
+    await this.animateMoveTo(loc.x, loc.z);
     
     if (loc.workstation) {
-      this.claimWorkstation(loc.workstation);
+      await this.claimWorkstation(loc.workstation);
     }
     
     // Show "thinking" emote
@@ -133,16 +209,15 @@ class ShalomPresence {
   }
 
   // Called when I finish responding
-  onResponseComplete() {
+  async onResponseComplete() {
     this.isProcessing = false;
     
-    // Return to home base (Vault)
-    setTimeout(() => {
-      if (!this.isProcessing) {
-        this.moveTo(-23, 22, 'idle');
-        this.broadcastEmote('happy');
+    // Return to cave after a delay
+    setTimeout(async () => {
+      if (!this.isProcessing && !this.inCave) {
+        await this.returnToCave();
       }
-    }, 2000);
+    }, 30000);  // Return to cave after 30s of inactivity
   }
 
   moveTo(x, z, action = 'walk') {
