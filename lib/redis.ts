@@ -16,11 +16,12 @@ let redis: Redis | null = null;
 export function getRedisClient(): Redis | null {
   if (redis) return redis;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Support both Upstash KV naming conventions
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (!url || !token) {
-    console.warn('[Redis] Missing UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN');
+    console.warn('[Redis] Missing KV_REST_API_URL/KV_REST_API_TOKEN');
     return null;
   }
 
@@ -36,7 +37,8 @@ export function getRedisClient(): Redis | null {
  * Check if Redis is available
  */
 export function isRedisAvailable(): boolean {
-  return !!process.env.UPSTASH_REDIS_REST_URL && !!process.env.UPSTASH_REDIS_REST_TOKEN;
+  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) ||
+         !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 }
 
 /**
