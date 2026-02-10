@@ -7,7 +7,7 @@
 const { RealmClient, WORK_ZONES } = require('./realm-client.cjs');
 
 const KOBOLDS = [
-  { id: 'shalom', name: 'Shalom', type: 'shalom', color: '#9333ea' },
+  // Note: 'shalom' is managed by shalom-presence.cjs - I AM the dragon!
   { id: 'daily-kobold', name: 'Daily Kobold', type: 'daily', color: '#22c55e' },
   { id: 'trade-kobold', name: 'Trade Kobold', type: 'trade', color: '#f97316' },
   { id: 'deploy-kobold', name: 'Deploy Kobold', type: 'deploy', color: '#3b82f6' }
