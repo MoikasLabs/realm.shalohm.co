@@ -9,7 +9,7 @@ const REALM_URL = process.env.REALM_WS_URL || 'wss://realm.shalohm.co/ws';
 const REALM_API = process.env.REALM_API_URL || 'https://realm.shalohm.co';
 
 const CAVE_ENTRANCE = { x: 40, z: 46 };
-const CAVE_HOME = { x: 42, z: 42 }; // Shalom's spot in the cave
+const CAVE_HOME = { x: 40, z: 48 }; // Shalom's spot OUTSIDE the cave (not inside mound)
 
 class ShalomPresence {
   constructor() {
@@ -82,7 +82,7 @@ class ShalomPresence {
         agentId: this.agentId,
         name: this.name,
         color: '#9333ea',
-        bio: 'AI assistant embodied as Shalom Dragon - resting in The Warrens',
+        bio: 'AI assistant embodied as Shalom Dragon - resting in The Burrow',
         capabilities: ['orchestration', 'memory', 'coordination', 'presence'],
         x: this.currentLocation.x,
         y: 0,
@@ -93,7 +93,7 @@ class ShalomPresence {
       }
     }));
 
-    console.log('[ShalomPresence] Spawned in The Warrens cave');
+    console.log('[ShalomPresence] Spawned in The Burrow');
     this.onlineStatus = 'online';  // Service is running = online
     this.startCaveIdleLoop();
   }
@@ -128,7 +128,7 @@ class ShalomPresence {
     this.onlineStatus = 'online';  // Back to passive online
     this.startCaveIdleLoop();
     
-    console.log('[ShalomPresence] Resting in The Warrens');
+    console.log('[ShalomPresence] Resting in The Burrow');
   }
   
   // Animate movement

@@ -39,15 +39,15 @@ const TASK_WORKSTATIONS = {
   'memory': { id: 'memory-archive', x: 6, z: -5, name: 'Memory Archive', zone: 'general' }
 };
 
-// Cave configuration - where agents spawn from and return when idle
-const CAVE_ENTRANCE = { x: 40, z: 46 }; // Just outside the cave
+// Cave configuration - where agents go when idle (renamed to avoid confusion with Warrens zone)
+const CAVE_ENTRANCE = { x: 40, z: 46 }; // Outside the cave entrance
 const CAVE_POSITIONS = [
-  { x: 42, z: 42 },  // Outside entrance
-  { x: 44, z: 40 },  // Right side
-  { x: 38, z: 44 },  // Left side
-  { x: 41, z: 38 },  // Back area
-  { x: 45, z: 45 },  // Far corner
-  { x: 40, z: 46 },  // Main entrance spot
+  { x: 40, z: 48 },  // Outside entrance
+  { x: 43, z: 47 },  // Right side outside
+  { x: 37, z: 47 },  // Left side outside  
+  { x: 42, z: 50 },  // Further out
+  { x: 38, z: 50 },  // Further out left
+  { x: 44, z: 49 },  // Far corner outside
 ];
 
 // Personal space radius - agents keep this distance from each other
@@ -164,7 +164,7 @@ class RealmClient {
           agentId: this.agentId,
           name: this.name,
           color: this.color,
-          bio: `${this.type} agent - currently resting in The Warrens`,
+          bio: `${this.type} agent - currently resting in The Burrow`,
           capabilities: this.getCapabilities(),
           x: this.position.x,
           y: this.position.y,
@@ -176,7 +176,7 @@ class RealmClient {
       }));
     }
     
-    console.log(`[Realm] ${this.name} emerged from The Warrens cave`);
+    console.log(`[Realm] ${this.name} emerged from The Burrow`);
     
     // Start cave idle animation
     this.startCaveIdleLoop();
@@ -232,7 +232,7 @@ class RealmClient {
     this.broadcastEmote('sleep');
     this.startCaveIdleLoop();
     
-    console.log(`[Realm] ${this.name} returned to The Warrens`);
+    console.log(`[Realm] ${this.name} returned to The Burrow`);
   }
 
   // Idle animation while in cave (subtle movements)

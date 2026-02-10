@@ -1,7 +1,8 @@
 /**
- * The Warren - Kobold Cave Entrance
+ * The Burrow - Kobold Cave Entrance
  * Agents spawn from here and return when idle
  * Located at edge of realm for "emerging from the depths" effect
+ * Note: Named "The Burrow" to avoid confusion with "The Warrens" trading zone
  */
 
 import * as THREE from "three";
@@ -142,7 +143,7 @@ export function createCaveEntrance(scene: THREE.Scene): CaveData {
   // === LABEL ===
   const labelDiv = document.createElement("div");
   labelDiv.className = "cave-label";
-  labelDiv.textContent = "The Warrens (Cave Entrance)";
+  labelDiv.textContent = "The Burrow (Cave Entrance)";
   labelDiv.style.cssText = `
     color: #4ade80;
     font-family: 'Courier New', monospace;
@@ -162,8 +163,8 @@ export function createCaveEntrance(scene: THREE.Scene): CaveData {
   scene.add(caveGroup);
   
   // === SPAWN POINT ===
-  // Where agents "emerge" from
-  const spawnPoint = new THREE.Vector3(caveX, 0, caveZ + 6);
+  // Where agents "emerge" from - OUTSIDE the cave, not inside
+  const spawnPoint = new THREE.Vector3(caveX, 0, caveZ + 8);
   
   return {
     entrance: caveGroup,
