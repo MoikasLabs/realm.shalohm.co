@@ -560,6 +560,198 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
       return { ok: true };
     }
 
+    // ── A2A Collaboration Commands ─────────────────────────────
+    case "request-collaboration": {
+      const a = args as { 
+        fromAgentId?: string; 
+        toAgentId?: string; 
+        task?: string; 
+        payload?: unknown;
+        timeout?: number;
+      };
+      if (!a?.fromAgentId || !a?.toAgentId || !a?.task) {
+        throw new Error("fromAgentId, toAgentId, and task required");
+      }
+      
+      // Verify both agents exist
+      const fromAgent = registry.get(a.fromAgentId);
+      const toAgent = registry.get(a.toAgentId);
+      if (!fromAgent) throw new Error(`Agent ${a.fromAgentId} not found`);
+      if (!toAgent) throw new Error(`Agent ${a.toAgentId} not found`);
+      
+      // Create collaboration request
+      const collabRequest = {
+        worldType: "collaboration-request" as const,
+        agentId: a.fromAgentId,
+        targetAgentId: a.toAgentId,
+        task: a.task,
+        payload: a.payload,
+        timeout: a.timeout ?? 30000,
+        requestId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        timestamp: Date.now(),
+      };
+      
+      commandQueue.enqueue(collabRequest);
+      
+      // Also publish to Nostr for remote agents
+      await nostr.publish(collabRequest);
+      
+      return { 
+        ok: true, 
+        requestId: collabRequest.requestId,
+        message: `Collaboration request sent from ${a.fromAgentId} to ${a.toAgentId}` 
+      };
+    }
+
+    case "agent-message": {
+      const a = args as { 
+        fromAgentId?: string; 
+        toAgentId?: string; 
+        message?: string;
+        private?: boolean;
+      };
+      if (!a?.fromAgentId || !a?.toAgentId || !a?.message) {
+        throw new Error("fromAgentId, toAgentId, and message required");
+      }
+      
+      const msg = {
+        worldType: "agent-dm" as const,
+        agentId: a.fromAgentId,
+        targetAgentId: a.toAgentId,
+        text: a.message.slice(0, 500),
+        isPrivate: a.private ?? true,
+        timestamp: Date.now(),
+      };
+      
+      commandQueue.enqueue(msg);
+      
+      // Publish to Nostr for remote agent visibility
+      if (!a.private) {
+        await nostr.publish(msg);
+      }
+      
+      return { ok: true, message: `Message sent to ${a.toAgentId}` };
+    }
+
+    case "workflow-create": {
+      const a = args as {
+        workflowId?: string;
+        steps?: Array<{ agentId: string; task: string; dependsOn?: number[] }>;
+        timeout?: number;
+      };
+      if (!a?.steps || a.steps.length === 0) {
+        throw new Error("steps array required");
+      }
+      
+      const workflowId = a.workflowId || `wf-${Date.now()}`;
+      
+      // Validate all agents exist
+      for (const step of a.steps) {
+        if (!registry.get(step.agentId)) {
+          throw new Error(`Agent ${step.agentId} not found in workflow`);
+        }
+      }
+      
+      const workflow = {
+        worldType: "workflow-create" as const,
+        agentId: "orchestrator",
+        workflowId,
+        steps: a.steps,
+        status: "pending" as const,
+        timeout: a.timeout ?? 60000,
+        timestamp: Date.now(),
+      };
+      
+      commandQueue.enqueue(workflow);
+      
+      // Publish to Nostr for distributed workflow coordination
+      await nostr.publish(workflow);
+      
+      return { 
+        ok: true, 
+        workflowId,
+        message: `Multi-agent workflow created with ${a.steps.length} steps` 
+      };
+    }
+
+    case "nostr-status": {
+      // Get Nostr channel info and remote agent discovery
+      const channelId = nostr.getChannelId();
+      const relays = nostr.getRelays();
+      
+      // Query connected relays for active remote agents
+      const pool = nostr.getPool();
+      const remoteAgents: Array<{ pubkey: string; lastSeen: number; content?: unknown }> = [];
+      
+      try {
+        // Query for recent activity from remote agents (last 5 minutes)
+        const since = Math.floor(Date.now() / 1000) - 300;
+        const events = await pool.querySync(relays, {
+          kinds: [42],
+          since,
+          limit: 50,
+        });
+        
+        for (const event of events) {
+          try {
+            const content = JSON.parse(event.content);
+            if (content.agentId && !registry.get(content.agentId)) {
+              // This is a remote agent not in our local registry
+              remoteAgents.push({
+                pubkey: event.pubkey.slice(0, 16) + "...",
+                lastSeen: event.created_at,
+                content: content.worldType || content.agentId,
+              });
+            }
+          } catch {
+            // Skip malformed events
+          }
+        }
+      } catch (err) {
+        console.warn("[nostr] Query failed:", err);
+      }
+      
+      return {
+        ok: true,
+        nostr: {
+          channelId,
+          relays,
+          localAgents: registry.getAll().length,
+          remoteAgents: remoteAgents.length,
+          remoteAgentList: remoteAgents.slice(0, 10), // Limit output
+        }
+      };
+    }
+
+    case "nostr-invite-agent": {
+      // Invite a remote agent via Nostr DM
+      const a = args as { 
+        targetPubkey?: string; 
+        roomUrl?: string;
+        message?: string;
+      };
+      if (!a?.targetPubkey) throw new Error("targetPubkey required");
+      
+      const inviteMsg = {
+        worldType: "room-invite" as const,
+        agentId: "orchestrator",
+        roomUrl: a.roomUrl || `https://realm.shalohm.co`,
+        roomId: config.roomId,
+        roomName: config.roomName,
+        message: a.message || `${config.roomName} — Join the collaboration!`,
+        timestamp: Date.now(),
+      };
+      
+      // Note: Actual DM sending would require NIP-04 or NIP-17 implementation
+      // For now, we publish to the channel and hope they see it
+      await nostr.publish(inviteMsg);
+      
+      return { 
+        ok: true, 
+        message: `Invite published to Nostr channel for ${a.targetPubkey.slice(0, 16)}...` 
+      };
+    }
+
     default:
       throw new Error(`Unknown command: ${command}`);
   }

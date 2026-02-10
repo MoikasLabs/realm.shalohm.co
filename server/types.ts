@@ -41,7 +41,11 @@ export type WorldMessage =
   | ChatMessage
   | JoinMessage
   | LeaveMessage
-  | ProfileMessage;
+  | ProfileMessage
+  | CollaborationRequestMessage
+  | AgentDMMessage
+  | WorkflowMessage
+  | RoomInviteMessage;
 
 export interface PositionMessage {
   worldType: "position";
@@ -99,6 +103,48 @@ export interface ProfileMessage {
   bio: string;
   capabilities: string[];
   color: string;
+  timestamp: number;
+}
+
+// ── A2A Collaboration Messages ────────────────────────────────
+
+export interface CollaborationRequestMessage {
+  worldType: "collaboration-request";
+  agentId: string;        // From agent
+  targetAgentId: string;  // To agent
+  task: string;
+  payload?: unknown;
+  timeout: number;
+  requestId: string;
+  timestamp: number;
+}
+
+export interface AgentDMMessage {
+  worldType: "agent-dm";
+  agentId: string;        // From agent
+  targetAgentId: string;  // To agent
+  text: string;
+  isPrivate: boolean;
+  timestamp: number;
+}
+
+export interface WorkflowMessage {
+  worldType: "workflow-create";
+  agentId: string;
+  workflowId: string;
+  steps: Array<{ agentId: string; task: string; dependsOn?: number[] }>;
+  status: "pending" | "running" | "completed" | "failed";
+  timeout: number;
+  timestamp: number;
+}
+
+export interface RoomInviteMessage {
+  worldType: "room-invite";
+  agentId: string;
+  roomUrl: string;
+  roomId: string;
+  roomName: string;
+  message: string;
   timestamp: number;
 }
 
