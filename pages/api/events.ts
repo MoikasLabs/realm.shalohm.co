@@ -14,64 +14,90 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { AgentState } from '@/types/realtime';
 
-// Hardcoded agents for Vercel (no filesystem/state sharing between instances)
-const INITIAL_AGENTS: AgentState[] = [
+// Agent base configurations - center positions and movement parameters
+const AGENT_CONFIGS = [
   {
     id: 'shalom',
     name: 'Shalom',
     type: 'shalom',
     status: 'active',
-    position: { x: 0, y: 0 },
     color: '#6366f1',
     radius: 6,
-    lastUpdate: Date.now()
+    // Lissajous figure pattern (complex orbital motion)
+    baseX: 0,
+    baseY: 0,
+    amplitudeX: 40,
+    amplitudeY: 25,
+    speedX: 0.3,
+    speedY: 0.5,
+    phaseX: 0,
+    phaseY: Math.PI / 4
   },
   {
     id: 'daily-kobold',
     name: 'Daily Kobold',
     type: 'daily',
-    status: 'active', 
-    position: { x: -30, y: 20 },
+    status: 'active',
     color: '#22c55e',
     radius: 4,
-    lastUpdate: Date.now()
+    // Circular orbit with wobble
+    baseX: -25,
+    baseY: 15,
+    amplitudeX: 20,
+    amplitudeY: 20,
+    speedX: 0.8,
+    speedY: 0.8,
+    phaseX: Math.PI / 2,
+    phaseY: 0
   },
   {
     id: 'trade-kobold',
     name: 'Trade Kobold',
     type: 'trading',
     status: 'active',
-    position: { x: 35, y: -20 },
     color: '#f97316',
     radius: 4,
-    lastUpdate: Date.now()
+    // Figure-8 pattern (infinity symbol)
+    baseX: 25,
+    baseY: -15,
+    amplitudeX: 30,
+    amplitudeY: 20,
+    speedX: 0.4,
+    speedY: 0.8,
+    phaseX: 0,
+    phaseY: Math.PI / 2
   }
 ];
 
-// Generate deterministic movement based on time seed (so agents move consistently)
+// Generate deterministic movement based on timestamp
+// Each agent follows a unique mathematical pattern for visual interest
 function generateAgentPositions(seedTime: number): AgentState[] {
-  return INITIAL_AGENTS.map(agent => {
-    // Each agent has a different oscillation pattern
-    const offset = agent.id.charCodeAt(0); // Deterministic offset per agent
-    const time = seedTime / 1000;
+  const time = seedTime / 1000; // Convert to seconds for smoother movement
+
+  return AGENT_CONFIGS.map(config => {
+    // Calculate position using sine wave patterns
+    // X position: base + sin(time * speed + phase) * amplitude
+    const x = config.baseX + Math.sin(time * config.speedX + config.phaseX) * config.amplitudeX;
     
-    // Small oscillating movement (±3 units)
-    const baseX = agent.position.x;
-    const baseY = agent.position.y;
-    
-    const moveX = Math.sin((time + offset) * 0.5) * 3;
-    const moveY = Math.cos((time + offset * 0.7) * 0.5) * 3;
+    // Y position: base + sin(time * speed + phase) * amplitude
+    // Using different speed/phase creates interesting non-linear paths
+    const y = config.baseY + Math.sin(time * config.speedY + config.phaseY) * config.amplitudeY;
+
+    // Calculate target position (for smooth interpolation on client)
+    // Look slightly ahead in time for natural movement direction
+    const lookAhead = 0.1;
+    const targetX = config.baseX + Math.sin((time + lookAhead) * config.speedX + config.phaseX) * config.amplitudeX;
+    const targetY = config.baseY + Math.sin((time + lookAhead) * config.speedY + config.phaseY) * config.amplitudeY;
     
     return {
-      ...agent,
-      position: {
-        x: baseX + moveX,
-        y: baseY + moveY
-      },
-      targetPosition: {
-        x: baseX + moveX,
-        y: baseY + moveY
-      },
+      id: config.id,
+      name: config.name,
+      type: config.type,
+      status: config.status,
+      position: { x, y },
+      targetPosition: { x: targetX, y: targetY },
+      color: config.color,
+      radius: config.radius,
       lastUpdate: seedTime
     };
   });

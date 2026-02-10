@@ -106,12 +106,12 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
    */
   const connect = useCallback(() => {
     if (typeof window === 'undefined') {
-      console.warn('[useSSE] Cannot connect on server-side');
+      // Cannot connect on server-side
       return;
     }
 
     if (eventSourceRef.current?.readyState === EventSource.OPEN) {
-      console.log('[useSSE] Already connected, skipping');
+      // Already connected, skip
       return;
     }
 
@@ -120,15 +120,12 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
       eventSourceRef.current.close();
     }
 
-    console.log('[useSSE] Connecting to SSE server...');
-    
     const eventSource = new EventSource(SSE_ENDPOINT);
     eventSourceRef.current = eventSource;
     shouldReconnectRef.current = true;
 
     // Connection opened
     eventSource.onopen = () => {
-      console.log('[useSSE] Connected to SSE server');
       setIsConnected(true);
       onConnect?.();
     };
@@ -172,7 +169,6 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
 
         // Auto-reconnect if enabled
         if (shouldReconnectRef.current && autoReconnect) {
-          console.log(`[useSSE] Reconnecting in ${RECONNECT_DELAY}ms...`);
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, RECONNECT_DELAY);
@@ -197,7 +193,6 @@ export function useSSE(options: UseSSEOptions = {}): UseSSEReturn {
 
     const eventSource = eventSourceRef.current;
     if (eventSource) {
-      console.log('[useSSE] Disconnecting from SSE...');
       eventSource.close();
       eventSourceRef.current = null;
       setIsConnected(false);
