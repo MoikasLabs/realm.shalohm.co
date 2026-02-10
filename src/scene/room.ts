@@ -338,6 +338,97 @@ export function createScene() {
     Warrens: { color: 0x44ff88, secondary: 0x66ffaa, intensity: 3.0 },
     General: { color: 0x4488ff, secondary: 0x66aaff, intensity: 2.5 }
   };
+
+  // SHARED CRYSTAL MATERIALS BY ZONE - Prevents WebGL texture limit errors
+  const crystalMaterials = {
+    Forge: new THREE.MeshStandardMaterial({
+      color: zoneColors.Forge.color,
+      roughness: 0.1,
+      metalness: 0.7,
+      emissive: zoneColors.Forge.color,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.9
+    }),
+    Spire: new THREE.MeshStandardMaterial({
+      color: zoneColors.Spire.color,
+      roughness: 0.1,
+      metalness: 0.7,
+      emissive: zoneColors.Spire.color,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.9
+    }),
+    Warrens: new THREE.MeshStandardMaterial({
+      color: zoneColors.Warrens.color,
+      roughness: 0.1,
+      metalness: 0.7,
+      emissive: zoneColors.Warrens.color,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.9
+    }),
+    General: new THREE.MeshStandardMaterial({
+      color: zoneColors.General.color,
+      roughness: 0.1,
+      metalness: 0.7,
+      emissive: zoneColors.General.color,
+      emissiveIntensity: 0.5,
+      transparent: true,
+      opacity: 0.9
+    })
+  };
+
+  const secondaryMaterials = {
+    Forge: new THREE.MeshStandardMaterial({
+      color: zoneColors.Forge.secondary,
+      roughness: 0.15,
+      metalness: 0.6,
+      emissive: zoneColors.Forge.secondary,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0.85
+    }),
+    Spire: new THREE.MeshStandardMaterial({
+      color: zoneColors.Spire.secondary,
+      roughness: 0.15,
+      metalness: 0.6,
+      emissive: zoneColors.Spire.secondary,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0.85
+    }),
+    Warrens: new THREE.MeshStandardMaterial({
+      color: zoneColors.Warrens.secondary,
+      roughness: 0.15,
+      metalness: 0.6,
+      emissive: zoneColors.Warrens.secondary,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0.85
+    }),
+    General: new THREE.MeshStandardMaterial({
+      color: zoneColors.General.secondary,
+      roughness: 0.15,
+      metalness: 0.6,
+      emissive: zoneColors.General.secondary,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0.85
+    })
+  };
+
+  // Shared ring material
+  const sharedRingMat = new THREE.MeshStandardMaterial({ 
+    color: 0x888888, 
+    roughness: 0.4,
+    metalness: 0.8
+  });
+
+  // Shared geometries
+  const mainCrystalGeo = new THREE.ConeGeometry(0.4, 3, 6);
+  const secCrystalGeo = new THREE.ConeGeometry(0.2, 1.5, 5);
+  const ringGeo = new THREE.TorusGeometry(0.15, 0.03, 8, 16);
   
   const crystalFormations = [
     // Forge zone crystals (orange/red)
@@ -369,37 +460,19 @@ export function createScene() {
     // Scale based on size
     const scale = size === "large" ? 1.5 : size === "medium" ? 1.0 : 0.6;
     
-    // Main crystal
-    const mainCrystalGeo = new THREE.ConeGeometry(0.4 * scale, 3 * scale, 6);
-    const mainCrystalMat = new THREE.MeshStandardMaterial({
-      color: zoneColor.color,
-      roughness: 0.1,
-      metalness: 0.7,
-      emissive: zoneColor.color,
-      emissiveIntensity: 0.5,
-      transparent: true,
-      opacity: 0.9
-    });
-    const mainCrystal = new THREE.Mesh(mainCrystalGeo, mainCrystalMat);
+    // Main crystal - use shared material by zone
+    const mainCrystal = new THREE.Mesh(mainCrystalGeo, crystalMaterials[zone]);
+    mainCrystal.scale.set(scale, scale, scale);
     mainCrystal.rotation.x = Math.PI;
     mainCrystal.position.y = -0.5 * scale;
     mainCrystal.castShadow = true;
     crystalGroup.add(mainCrystal);
     
-    // Secondary crystals
+    // Secondary crystals - use shared secondary material
     const numSecondaries = size === "large" ? 3 : size === "medium" ? 2 : 1;
     for (let i = 0; i < numSecondaries; i++) {
-      const secGeo = new THREE.ConeGeometry(0.2 * scale, 1.5 * scale, 5);
-      const secMat = new THREE.MeshStandardMaterial({
-        color: zoneColor.secondary,
-        roughness: 0.15,
-        metalness: 0.6,
-        emissive: zoneColor.secondary,
-        emissiveIntensity: 0.3,
-        transparent: true,
-        opacity: 0.85
-      });
-      const secCrystal = new THREE.Mesh(secGeo, secMat);
+      const secCrystal = new THREE.Mesh(secCrystalGeo, secondaryMaterials[zone]);
+      secCrystal.scale.set(scale, scale, scale);
       
       const angle = (i / numSecondaries) * Math.PI * 2 + (index * 0.5);
       const radius = 0.3 * scale;
@@ -414,14 +487,9 @@ export function createScene() {
       crystalGroup.add(secCrystal);
     }
     
-    // Add chain/hanging mechanism (visible ring)
-    const ringGeo = new THREE.TorusGeometry(0.15 * scale, 0.03 * scale, 8, 16);
-    const ringMat = new THREE.MeshStandardMaterial({ 
-      color: 0x888888, 
-      roughness: 0.4,
-      metalness: 0.8
-    });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    // Ring - shared material
+    const ring = new THREE.Mesh(ringGeo, sharedRingMat);
+    ring.scale.set(scale, scale, scale);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 1.5 * scale;
     crystalGroup.add(ring);
