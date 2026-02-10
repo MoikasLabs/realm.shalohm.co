@@ -122,6 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       agentId,
       name: existingState?.name || defaults.name || agentId,
       type: existingState?.type || defaults.type || 'custom',
+      status: existingState?.status || 'idle',
       lastUpdate: timestamp || Date.now(),
     };
 
