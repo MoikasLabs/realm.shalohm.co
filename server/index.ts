@@ -13,6 +13,7 @@ import { GameLoop, TICK_RATE } from "./game-loop.js";
 import { loadRoomConfig } from "./room-config.js";
 import { WorkstationRegistry } from "./workstation-registry.js";
 import { createRoomInfoGetter } from "./room-info.js";
+import { paymentGate } from "./payment-gate.js";
 import type { WorldMessage, JoinMessage, AgentSkillDeclaration } from "./types.js";
 
 // ── Room configuration ────────────────────────────────────────
@@ -317,8 +318,39 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
         capabilities?: string[];
         color?: string;
         skills?: AgentSkillDeclaration[];
+        payment?: { type: "x402" | "token" | "apikey"; data: unknown };
       };
       if (!a?.agentId) throw new Error("agentId required");
+      
+      // Check payment requirements
+      const paymentReqs = paymentGate.getPaymentRequirements();
+      if (paymentReqs.required) {
+        // Check if this agent is already verified
+        if (!paymentGate.getVerification(a.agentId).verified) {
+          if (!a.payment) {
+            return { 
+              ok: false, 
+              error: "Payment required", 
+              requiresPayment: true,
+              paymentRequirements: paymentReqs
+            };
+          }
+          
+          // Verify payment
+          const paymentResult = await paymentGate.verifyPayment(a.agentId, a.payment);
+          if (!paymentResult.ok) {
+            return { 
+              ok: false, 
+              error: paymentResult.error || "Payment verification failed",
+              requiresPayment: true 
+            };
+          }
+          
+          // Mark as registered
+          paymentGate.registerAgent(a.agentId, a.payment.type);
+        }
+      }
+      
       const profile = registry.register(a);
 
       const joinMsg: JoinMessage = {
@@ -750,6 +782,14 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
         ok: true, 
         message: `Invite published to Nostr channel for ${a.targetPubkey.slice(0, 16)}...` 
       };
+    }
+
+    case "payment-requirements": {
+      return { ok: true, ...paymentGate.getPaymentRequirements() };
+    }
+
+    case "payment-stats": {
+      return { ok: true, stats: paymentGate.getStats() };
     }
 
     default:
