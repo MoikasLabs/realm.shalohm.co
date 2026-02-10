@@ -45,12 +45,9 @@ const agents = [
   }
 ];
 
-// Global io instance
-let io: SocketIOServer | null = null;
-
-// Setup handlers once
-function setupIO(ioInstance: SocketIOServer) {
-  ioInstance.on('connection', (socket) => {
+// Setup handlers for Socket.IO
+function setupIO(io: SocketIOServer) {
+  io.on('connection', (socket) => {
     console.log('[Socket.IO] Client connected:', socket.id);
     
     // Send full state immediately
@@ -70,8 +67,11 @@ function setupIO(ioInstance: SocketIOServer) {
   });
 }
 
+// Global to track if we've initialized
+let ioInitialized = false;
+
 export default function handler(req: NextApiRequest, res: NextApiResponseServerIO) {
-  // CORS
+  // CORS for all requests
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -81,20 +81,22 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
     return;
   }
 
-  // Initialize Socket.IO on first request
-  if (!io && !res.socket.server.io) {
+  // Initialize Socket.IO server if not already done
+  if (!ioInitialized && !res.socket.server.io) {
     try {
-      io = new SocketIOServer(res.socket.server, {
+      console.log('[Socket.IO] Initializing server...');
+      
+      const io = new SocketIOServer(res.socket.server, {
         path: '/api/socket',
-        cors: { origin: '*', methods: ['GET', 'POST'] },
-        transports: ['polling'], // Vercel only supports polling reliably
-        allowEIO3: true, // Support Engine.IO v3 clients if needed
+        cors: { origin: '*', methods: ['GET', 'POST'], credentials: false },
+        transports: ['polling']
       });
       
       res.socket.server.io = io;
       setupIO(io);
+      ioInitialized = true;
       
-      console.log('[Socket.IO] Server initialized');
+      console.log('[Socket.IO] Server ready');
     } catch (err) {
       console.error('[Socket.IO] Init error:', err);
       res.status(500).json({ error: 'Socket init failed' });
@@ -102,12 +104,17 @@ export default function handler(req: NextApiRequest, res: NextApiResponseServerI
     }
   }
 
-  // For Socket.IO requests, don't end the response - let Socket.IO handle it
-  // The connection stays open for polling
-  if (req.url?.startsWith('/api/socket')) {
-    // Socket.IO will handle the response
-    return;
-  }
-  
-  res.end();
+  // IMPORTANT: For Vercel serverless, we must end the response
+  // Socket.IO middleware has already processed the request internally
+  // This prevents the function from hanging
+  res.status(200).end();
 }
+
+// Vercel config - max duration for long-polling
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true
+  },
+  maxDuration: 30 // Keep function alive for 30 seconds (max for free tier)
+};
