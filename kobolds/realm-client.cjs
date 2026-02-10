@@ -130,7 +130,50 @@ class RealmClient {
       }));
     }
     
+    // Start idle movement loop
+    this.startIdleLoop();
+    
+    // Walk to job zone after 5 seconds
+    setTimeout(() => this.goToJobZone(), 5000);
+    
     console.log(`[Realm] ${this.name} spawned at ${spawnPos.name}`);
+  }
+
+  getJobZone() {
+    // Map agent types to their work zones
+    const zones = {
+      shalom: 'spire',
+      daily: 'warrens',
+      trade: 'warrens',
+      deploy: 'forge'
+    };
+    return zones[this.type] || 'command';
+  }
+
+  async goToJobZone() {
+    const zoneName = this.getJobZone();
+    await this.goToWork(zoneName);
+  }
+
+  startIdleLoop() {
+    // Send position updates every 2 seconds with slight movement
+    this.idleInterval = setInterval(() => {
+      if (!this.isWorking && this.ws?.readyState === WebSocket.OPEN) {
+        // Add subtle random movement (patrol)
+        const jitter = 0.5;
+        this.position.x += (Math.random() - 0.5) * jitter;
+        this.position.z += (Math.random() - 0.5) * jitter;
+        this.position.rotation += (Math.random() - 0.5) * 0.2;
+        this.broadcastPosition();
+      }
+    }, 2000);
+  }
+
+  stopIdleLoop() {
+    if (this.idleInterval) {
+      clearInterval(this.idleInterval);
+      this.idleInterval = null;
+    }
   }
 
   async goToWork(zoneName) {
