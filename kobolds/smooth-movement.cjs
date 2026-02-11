@@ -81,6 +81,7 @@ class SmoothMovement {
       const startTime = Date.now();
       const maxDuration = options.timeout || 60000; // 60 second max
       
+      // HIGHER frequency updates (30 FPS) for smoother client sync
       this.moveInterval = setInterval(() => {
         const result = this.updateMovement();
         
@@ -104,7 +105,7 @@ class SmoothMovement {
           this.stop();
           resolve({ success: false, reason: 'timeout' });
         }
-      }, 50); // 20 FPS movement updates
+      }, 33); // 30 FPS movement updates (smoother sync)
     });
   }
 

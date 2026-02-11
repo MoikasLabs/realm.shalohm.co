@@ -8,6 +8,7 @@
 const { SmoothMovement } = require('./smooth-movement.cjs');
 const { CollisionValidator } = require('./collision-validator.js');
 const { CognitiveRealmClient } = require('./cognitive-realm-client.cjs');
+const { createEnhancedBroadcast } = require('./enhanced-broadcast.cjs');
 const fs = require('fs');
 const path = require('path');
 
@@ -62,6 +63,9 @@ class SmoothOnDemandAgent extends CognitiveRealmClient {
       });
       this.ws.on('error', reject);
     });
+    
+    // Enhance broadcast with velocity/state info for smooth client sync
+    createEnhancedBroadcast(this);
     
     // SPAWN AT THE DOOR (not at workstation)
     await this.spawnAtDoor();
