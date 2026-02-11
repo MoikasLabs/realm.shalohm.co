@@ -2,24 +2,24 @@
   "vault-unlocker": {
     "id": "vault-unlocker",
     "name": "Vault Unlocker Station",
-    "x": -23,
-    "z": 22,
+    "x": -35,
+    "z": 25,
     "zone": "spire",
     "radius": 3
   },
   "content-forge": {
     "id": "content-forge",
     "name": "Content Forge",
-    "x": -10,
-    "z": 10,
+    "x": 5,
+    "z": 15,
     "zone": "general",
     "radius": 3
   },
   "trade-terminal": {
     "id": "trade-terminal",
     "name": "Trading Terminal",
-    "x": 12,
-    "z": 18,
+    "x": 15,
+    "z": 8,
     "zone": "warrens",
     "radius": 3
   },
@@ -50,32 +50,32 @@
   "audit-helm": {
     "id": "audit-helm",
     "name": "Security Audit Helm",
-    "x": -15,
-    "z": 30,
+    "x": -25,
+    "z": 35,
     "zone": "spire",
     "radius": 3
   },
   "crypto-analyzer": {
     "id": "crypto-analyzer",
     "name": "Crypto Analyzer",
-    "x": -25,
-    "z": 28,
+    "x": -40,
+    "z": 20,
     "zone": "spire",
     "radius": 3
   },
   "market-scanner": {
     "id": "market-scanner",
     "name": "Market Scanner",
-    "x": 18,
-    "z": 25,
+    "x": 30,
+    "z": 15,
     "zone": "warrens",
     "radius": 3
   },
   "chart-analyzer": {
     "id": "chart-analyzer",
     "name": "Chart Analysis Desk",
-    "x": 20,
-    "z": 18,
+    "x": 35,
+    "z": 5,
     "zone": "warrens",
     "radius": 3
   },

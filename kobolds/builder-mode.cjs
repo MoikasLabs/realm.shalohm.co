@@ -89,14 +89,36 @@ class BuilderMode {
     console.log(`Config: ${WORKSTATION_CONFIG_PATH}`);
   }
 
-  move(id, x, z) {
+  move(id, x, z, options = {}) {
     if (!this.workstations[id]) {
       console.error(`❌ Workstation "${id}" not found`);
       return false;
     }
     
-    this.workstations[id].x = parseFloat(x);
-    this.workstations[id].z = parseFloat(z);
+    x = parseFloat(x);
+    z = parseFloat(z);
+    
+    // Validate placement
+    if (!options.force) {
+      const validation = this.validatePosition(x, z, id);
+      if (!validation.valid) {
+        console.log('\n⚠️  Position conflicts detected:');
+        for (const c of validation.conflicts) {
+          console.log(`   • ${c.name}: ${c.distance}m away (need ${c.required}m)`);
+        }
+        
+        // Suggest safe position
+        const safe = this.findSafePosition(x, z);
+        if (!safe.original && !safe.fallback) {
+          console.log(`\n💡 Suggested position: (${safe.x.toFixed(1)}, ${safe.z.toFixed(1)})`);
+          console.log('   Use --force to place anyway, or use suggested position.');
+          return false;
+        }
+      }
+    }
+    
+    this.workstations[id].x = x;
+    this.workstations[id].z = z;
     
     if (this.saveWorkstations()) {
       console.log(`✅ Moved "${this.workstations[id].name}" to (${x}, ${z})`);
@@ -123,6 +145,81 @@ class BuilderMode {
 
   get(id) {
     return this.workstations[id] || null;
+  }
+
+  // Check if position is valid (not too close to other workstations)
+  validatePosition(x, z, excludeId = null, minDistance = 15) {
+    const conflicts = [];
+    
+    for (const [id, ws] of Object.entries(this.workstations)) {
+      if (id === excludeId) continue;
+      
+      const dist = Math.sqrt((x - ws.x)**2 + (z - ws.z)**2);
+      if (dist < minDistance + (ws.radius || 3)) {
+        conflicts.push({
+          id,
+          name: ws.name,
+          distance: dist.toFixed(1),
+          required: minDistance + (ws.radius || 3),
+          position: `(${ws.x}, ${ws.z})`
+        });
+      }
+    }
+    
+    // Check obstacle zones
+    const obstacles = [
+      { name: 'Moltbook', x: -20, z: -20, r: 4 },
+      { name: 'Clawhub', x: 22, z: -22, r: 6 },
+      { name: 'Portal', x: 0, z: -35, r: 5 },
+      { name: 'Burrow', x: 40, z: 40, r: 8 }
+    ];
+    
+    for (const obs of obstacles) {
+      const dist = Math.sqrt((x - obs.x)**2 + (z - obs.z)**2);
+      if (dist < obs.r + 5) {
+        conflicts.push({
+          id: `obstacle-${obs.name}`,
+          name: `${obs.name} (obstacle)`,
+          distance: dist.toFixed(1),
+          required: obs.r + 5,
+          position: `(${obs.x}, ${obs.z})`
+        });
+      }
+    }
+    
+    return {
+      valid: conflicts.length === 0,
+      conflicts
+    };
+  }
+  
+  // Find safe position near target (spiral search)
+  findSafePosition(targetX, targetZ, preferredDistance = 20) {
+    const minDistance = 15;
+    
+    // First try the target position
+    let check = this.validatePosition(targetX, targetZ, null, minDistance);
+    if (check.valid) return { x: targetX, z: targetZ, original: true };
+    
+    // Spiral search for safe position
+    const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+    const distances = [preferredDistance, preferredDistance + 5, preferredDistance + 10, preferredDistance + 15];
+    
+    for (const dist of distances) {
+      for (const angle of angles) {
+        const rad = angle * Math.PI / 180;
+        const testX = targetX + Math.cos(rad) * dist;
+        const testZ = targetZ + Math.sin(rad) * dist;
+        
+        check = this.validatePosition(testX, testZ, null, minDistance);
+        if (check.valid) {
+          return { x: testX, z: testZ, original: false, offset: dist, angle };
+        }
+      }
+    }
+    
+    // Fallback: return position anyway with warning
+    return { x: targetX, z: targetZ, original: true, fallback: true };
   }
 
   saveLayout(name) {
@@ -315,13 +412,41 @@ function main() {
       builder.list();
       break;
       
+    case 'validate':
+      console.log('\n╔════════════════════════════════════════════════════════════╗');
+      console.log('║              WORKSTATION VALIDATION                        ║');
+      console.log('╠════════════════════════════════════════════════════════════╣');
+      
+      let issues = 0;
+      for (const [id, ws] of Object.entries(builder.workstations)) {
+        const check = builder.validatePosition(ws.x, ws.z, id);
+        if (!check.valid) {
+          issues++;
+          console.log(`\n⚠️  ${ws.name} (${id}):`);
+          for (const c of check.conflicts) {
+            console.log(`   Too close to ${c.name}: ${c.distance}m (need ${c.required}m)`);
+          }
+        }
+      }
+      
+      if (issues === 0) {
+        console.log('║ ✅ All workstations properly spaced!                      ║');
+      } else {
+        console.log(`\n║ ⚠️  Found ${issues} workstations with spacing issues        ║`);
+        console.log('║    Use "move <id> <x> <z>" to reposition                  ║');
+      }
+      console.log('╚════════════════════════════════════════════════════════════╝\n');
+      break;
+      
     case 'move':
       if (args.length < 4) {
-        console.log('Usage: move <id> <x> <z>');
+        console.log('Usage: move <id> <x> <z> [--force]');
         console.log('Example: move k8s-deployer 30 -15');
+        console.log('         move k8s-deployer 30 -15 --force  (ignore collision warnings)');
         process.exit(1);
       }
-      builder.move(args[1], args[2], args[3]);
+      const forceMove = args.includes('--force');
+      builder.move(args[1], args[2], args[3], { force: forceMove });
       break;
       
     case 'resize':
@@ -364,12 +489,16 @@ function main() {
       console.log('╠═══════════════════════════════════════════════════╣');
       console.log('║  Commands:                                        ║');
       console.log('║    list              - Show all workstations      ║');
-      console.log('║    move <id> <x> <z> - Move workstation           ║');
+      console.log('║    validate          - Check spacing conflicts    ║');
+      console.log('║    move <id> <x> <z> - Move workstation [safety]  ║');
       console.log('║    resize <id> <r>   - Change zone radius         ║');
       console.log('║    save <name>       - Save current layout        ║');
       console.log('║    load <name>       - Load saved layout          ║');
       console.log('║    layouts           - List saved layouts         ║');
       console.log('║    server [port]     - Start web UI + API server  ║');
+      console.log('╠═══════════════════════════════════════════════════╣');
+      console.log('║  Smart Placement: 15m minimum between stations    ║');
+      console.log('║  Auto-suggests safe positions if conflict         ║');
       console.log('╠═══════════════════════════════════════════════════╣');
       console.log('║  Web UI: Drag-and-drop workstation editor         ║');
       console.log('║  URL: http://localhost:18801/                     ║');
