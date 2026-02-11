@@ -187,7 +187,7 @@ class BuilderMode {
   }
 
   // Start HTTP API server for builder mode
-  startServer(port = 18801, authToken = null) {
+  startServer(port = 18801, authToken = null, serveUI = true) {
     // Load auth token from env or generate one
     const token = authToken || process.env.BUILDER_AUTH_TOKEN || this.generateAuthToken();
     
@@ -216,6 +216,19 @@ class BuilderMode {
       // GET /api/workstations - list all (public read)
       if (req.method === 'GET' && url.pathname === '/api/workstations') {
         res.end(JSON.stringify(this.workstations, null, 2));
+        return;
+      }
+      
+      // GET / - Serve the builder UI
+      if (req.method === 'GET' && url.pathname === '/') {
+        const uiPath = path.join(__dirname, 'builder-ui.html');
+        if (fs.existsSync(uiPath)) {
+          res.setHeader('Content-Type', 'text/html');
+          res.end(fs.readFileSync(uiPath));
+        } else {
+          res.statusCode = 404;
+          res.end(JSON.stringify({ error: 'UI not found' }));
+        }
         return;
       }
       
@@ -266,16 +279,17 @@ class BuilderMode {
     
     server.listen(port, () => {
       console.log(`╔═══════════════════════════════════════════════════╗`);
-      console.log(`║  Builder Mode API Server                          ║`);
+      console.log(`║  Builder Mode Server                              ║`);
       console.log(`╠═══════════════════════════════════════════════════╣`);
       console.log(`║  Port: ${port.toString().padEnd(39)} ║`);
+      console.log(`║  Web UI: http://localhost:${port}/                ║`);
       console.log(`║  Auth: Bearer token required for write ops        ║`);
       console.log(`╠═══════════════════════════════════════════════════╣`);
       console.log(`║  Endpoints:                                       ║`);
+      console.log(`║    GET  /                              (Web UI)   ║`);
       console.log(`║    GET  /api/workstations              (public)   ║`);
       console.log(`║    POST /api/login {apiKey}            (get token)║`);
       console.log(`║    POST /api/workstations/:id/move     (auth)     ║`);
-      console.log(`║    Headers: Authorization: Bearer <token>         ║`);
       console.log(`╚═══════════════════════════════════════════════════╝\n`);
       
       // Save token to file for reference
@@ -343,7 +357,7 @@ function main() {
       break;
       
     default:
-      console.log('╔═══════════════════════════════════════════════════╗');
+    console.log('╔═══════════════════════════════════════════════════╗');
       console.log('║  Builder Mode - Workstation Management            ║');
       console.log('╠═══════════════════════════════════════════════════╣');
       console.log('║  Commands:                                        ║');
@@ -353,7 +367,10 @@ function main() {
       console.log('║    save <name>       - Save current layout        ║');
       console.log('║    load <name>       - Load saved layout          ║');
       console.log('║    layouts           - List saved layouts         ║');
-      console.log('║    server [port]     - Start API server           ║');
+      console.log('║    server [port]     - Start web UI + API server  ║');
+      console.log('╠═══════════════════════════════════════════════════╣');
+      console.log('║  Web UI: Drag-and-drop workstation editor         ║');
+      console.log('║  URL: http://localhost:18801/                     ║');
       console.log('╚═══════════════════════════════════════════════════╝\n');
       console.log('Examples:');
       console.log('  node builder-mode.js list');

@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realm Builder - Workstation Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #1a1a1a;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            color: #10b981;
+        }
+        
+        .auth-section {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        input[type="text"], input[type="password"] {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        button {
+            background: #10b981;
+            color: #000;
+            border: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+        }
+        
+        .container {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+        
+        .workspace {
+            flex: 1;
+            position: relative;
+            background: 
+                linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            overflow: hidden;
+        }
+        
+        .workspace-label {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: #666;
+            font-size: 0.85rem;
+        }
+        
+        .origin {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #10b981;
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .origin::before, .origin::after {
+            content: '';
+            position: absolute;
+            background: #10b981;
+        }
+        
+        .origin::before {
+            width: 100px;
+            height: 1px;
+            left: -50px;
+            top: 2px;
+        }
+        
+        .origin::after {
+            width: 1px;
+            height: 100px;
+            left: 2px;
+            top: -50px;
+        }
+        
+        .origin-label {
+            position: absolute;
+            left: 55px;
+            top: 5px;
+            font-size: 0.7rem;
+            color: #10b981;
+        }
+        
+        .workstation {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            background: #1a1a1a;
+            border: 2px solid #10b981;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            cursor: grab;
+            min-width: 140px;
+            text-align: center;
+            transition: box-shadow 0.2s, transform 0.1s;
+            user-select: none;
+        }
+        
+        .workstation:hover {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+        
+        .workstation.dragging {
+            cursor: grabbing;
+            z-index: 1000;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+        }
+        
+        .workstation-name {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: #10b981;
+        }
+        
+        .workstation-id {
+            font-size: 0.7rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        
+        .workstation-coords {
+            font-size: 0.7rem;
+            color: #888;
+            margin-top: 0.25rem;
+            font-family: monospace;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: #1a1a1a;
+            border-left: 1px solid #333;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+        
+        .sidebar h2 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: #10b981;
+        }
+        
+        .info-box {
+            background: #2a2a2a;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+        
+        .info-box p {
+            margin-bottom: 0.5rem;
+            color: #aaa;
+        }
+        
+        .info-box strong {
+            color: #10b981;
+        }
+        
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .action-buttons button {
+            width: 100%;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #10b981;
+            color: #000;
+            padding: 1rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .toast.error {
+            background: #dc2626;
+            color: #fff;
+        }
+        
+        .status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .status.connected {
+            background: #10b981;
+        }
+        
+        .status.disconnected {
+            background: #dc2626;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+        }
+        
+        .scale-indicator {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            color: #666;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🐉 Realm Builder</h1>
+        <div class="auth-section">
+            <span id="connectionStatus"><span class="status disconnected"></span>Disconnected</span>
+            <input type="password" id="apiKey" placeholder="API Key" value="shalom-builder-2024">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="saveBtn" onclick="saveAll()" disabled>Save Layout</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="workspace" id="workspace">
+            <div class="workspace-label">Drag workstations to reposition • Scroll wheel to zoom</div>
+            <div class="origin">
+                <span class="origin-label">(0, 0)</span>
+            </div>
+            <div class="loading" id="loading">Connect to load workstations</div>
+        </div>
+        
+        <div class="sidebar">
+            <h2>Instructions</h2>
+            <div class="info-box">
+                <p><strong>1.</strong> Connect with API key to load current layout</p>
+                <p><strong>2.</strong> Drag workstations to new positions</p>
+                <p><strong>3.</strong> Click "Save Layout" to persist changes</p>
+                <p><strong>4.</strong> Changes take effect immediately in Realm</p>
+            </div>
+            
+            <h2>Legend</h2>
+            <div class="info-box">
+                <p><strong>Green border:</strong> Workstation zone</p>
+                <p><strong>X axis:</strong> Left (-) / Right (+)</p>
+                <p><strong>Z axis:</strong> Up (-) / Down (+)</p>
+                <p><strong>Grid:</strong> 50px = 5 units</p>
+            </div>
+            
+            <h2>Quick Actions</h2>
+            <div class="action-buttons">
+                <button onclick="resetLayout()">Reset to Default</button>
+                <button onclick="exportLayout()">Export JSON</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <div class="scale-indicator">Scale: 10px = 1 unit</div>
+
+    <script>
+        const API_BASE = 'http://localhost:18801';
+        let token = null;
+        let workstations = {};
+        let isConnected = false;
+        let scale = 10; // pixels per unit
+        let offsetX = window.innerWidth / 2;
+        let offsetY = window.innerHeight / 2;
+
+        async function connect() {
+            const apiKey = document.getElementById('apiKey').value;
+            
+            try {
+                // Login
+                const loginRes = await fetch(`${API_BASE}/api/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiKey })
+                });
+                
+                if (!loginRes.ok) {
+                    throw new Error('Invalid API key');
+                }
+                
+                const loginData = await loginRes.json();
+                token = loginData.token;
+                
+                // Load workstations
+                const wsRes = await fetch(`${API_BASE}/api/workstations`);
+                workstations = await wsRes.json();
+                
+                isConnected = true;
+                updateConnectionStatus(true);
+                renderWorkstations();
+                showToast('Connected! Drag workstations to move them.');
+                
+                document.getElementById('saveBtn').disabled = false;
+                document.getElementById('connectBtn').textContent = 'Reconnect';
+            } catch (err) {
+                showToast(err.message, true);
+            }
+        }
+
+        function renderWorkstations() {
+            const workspace = document.getElementById('workspace');
+            workspace.querySelectorAll('.workstation').forEach(el => el.remove());
+            document.getElementById('loading').style.display = 'none';
+            
+            for (const [id, ws] of Object.entries(workstations)) {
+                createWorkstationElement(id, ws);
+            }
+        }
+
+        function createWorkstationElement(id, ws) {
+            const el = document.createElement('div');
+            el.className = 'workstation';
+            el.dataset.id = id;
+            el.innerHTML = `
+                <div class="workstation-name">${ws.name}</div>
+                <div class="workstation-id">${id}</div>
+                <div class="workstation-coords">(${ws.x.toFixed(1)}, ${ws.z.toFixed(1)})</div>
+            `;
+            
+            // Convert world coords to screen coords
+            const screenX = offsetX + ws.x * scale;
+            const screenY = offsetY + ws.z * scale;
+            
+            el.style.left = `${screenX}px`;
+            el.style.top = `${screenY}px`;
+            
+            // Make draggable
+            makeDraggable(el);
+            
+            document.getElementById('workspace').appendChild(el);
+        }
+
+        function makeDraggable(el) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+            
+            el.addEventListener('mousedown', (e) => {
+                if (!isConnected) return;
+                isDragging = true;
+                el.classList.add('dragging');
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = parseFloat(el.style.left);
+                initialTop = parseFloat(el.style.top);
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                el.style.left = `${initialLeft + dx}px`;
+                el.style.top = `${initialTop + dy}px`;
+                
+                // Update coords display
+                const id = el.dataset.id;
+                const worldX = (initialLeft + dx - offsetX) / scale;
+                const worldZ = (initialTop + dy - offsetY) / scale;
+                
+                el.querySelector('.workstation-coords').textContent = 
+                    `(${worldX.toFixed(1)}, ${worldZ.toFixed(1)})`;
+            });
+            
+            document.addEventListener('mouseup', async (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                el.classList.remove('dragging');
+                
+                // Save new position
+                const id = el.dataset.id;
+                const screenX = parseFloat(el.style.left);
+                const screenY = parseFloat(el.style.top);
+                const worldX = (screenX - offsetX) / scale;
+                const worldZ = (screenY - offsetY) / scale;
+                
+                workstations[id].x = worldX;
+                workstations[id].z = worldZ;
+                
+                // Auto-save to server
+                await moveWorkstation(id, worldX, worldZ);
+            });
+        }
+
+        async function moveWorkstation(id, x, z) {
+            try {
+                const res = await fetch(`${API_BASE}/api/workstations/${id}/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ x, z })
+                });
+                
+                if (!res.ok) throw new Error('Save failed');
+                
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Moved ${id} to (${x.toFixed(1)}, ${z.toFixed(1)})`);
+                }
+            } catch (err) {
+                showToast('Move failed: ' + err.message, true);
+            }
+        }
+
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connectionStatus');
+            if (connected) {
+                status.innerHTML = '<span class="status connected"></span>Connected';
+            } else {
+                status.innerHTML = '<span class="status disconnected"></span>Disconnected';
+            }
+        }
+
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.toggle('error', isError);
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function resetLayout() {
+            if (!confirm('Reset to default layout? All changes will be lost.')) return;
+            // Reload from server
+            connect();
+        }
+
+        function exportLayout() {
+            const dataStr = JSON.stringify(workstations, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'workstation-layout.json';
+            link.click();
+        }
+
+        async function saveAll() {
+            showToast('Changes saved automatically!');
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            offsetX = window.innerWidth / 2;
+            offsetY = window.innerHeight / 2;
+            if (isConnected) renderWorkstations();
+        });
+    </script>
+</body>
+</html>
