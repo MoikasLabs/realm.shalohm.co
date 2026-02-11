@@ -198,9 +198,11 @@ class BuilderMode {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Content-Type', 'application/json');
       
-      // Auth check for write operations
+      // Auth check for write operations (except login)
       const isWriteOperation = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
-      if (isWriteOperation) {
+      const isLoginRequest = url.pathname === '/api/login';
+      
+      if (isWriteOperation && !isLoginRequest) {
         const authHeader = req.headers['authorization'] || '';
         const providedToken = authHeader.replace('Bearer ', '');
         
