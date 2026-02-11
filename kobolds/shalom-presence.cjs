@@ -17,7 +17,7 @@
  */
 
 const { CognitiveRealmClient } = require('./cognitive-realm-client.cjs');
-const { DelegationLearner } = require('./delegation-learner.js');
+const { DelegationLearner } = require('./delegation-learner.cjs');
 const fs = require('fs');
 const path = require('path');
 
