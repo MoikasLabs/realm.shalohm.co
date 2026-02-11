@@ -148,7 +148,8 @@ class BuilderMode {
   }
 
   // Check if position is valid (not too close to other workstations)
-  validatePosition(x, z, excludeId = null, minDistance = 15) {
+  // INCREASED to 25m for agent movement clearance
+  validatePosition(x, z, excludeId = null, minDistance = 25) {
     const conflicts = [];
     
     for (const [id, ws] of Object.entries(this.workstations)) {

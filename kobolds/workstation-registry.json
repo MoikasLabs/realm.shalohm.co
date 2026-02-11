@@ -2,80 +2,80 @@
   "vault-unlocker": {
     "id": "vault-unlocker",
     "name": "Vault Unlocker Station",
-    "x": -35,
-    "z": 25,
+    "x": -50,
+    "z": 30,
     "zone": "spire",
     "radius": 3
   },
   "content-forge": {
     "id": "content-forge",
     "name": "Content Forge",
-    "x": 5,
-    "z": 15,
+    "x": 20,
+    "z": 25,
     "zone": "general",
     "radius": 3
   },
   "trade-terminal": {
     "id": "trade-terminal",
     "name": "Trading Terminal",
-    "x": 15,
-    "z": 8,
+    "x": 50,
+    "z": 10,
     "zone": "warrens",
     "radius": 3
   },
   "k8s-deployer": {
     "id": "k8s-deployer",
     "name": "K8s Deployment Station",
-    "x": 40,
-    "z": -20,
+    "x": 55,
+    "z": -30,
     "zone": "forge",
     "radius": 3
   },
   "docker-builder": {
     "id": "docker-builder",
     "name": "Docker Builder",
-    "x": 48,
-    "z": -25,
+    "x": 65,
+    "z": -20,
     "zone": "forge",
     "radius": 3
   },
   "terraform-station": {
     "id": "terraform-station",
     "name": "Terraform Workbench",
-    "x": 45,
-    "z": -5,
+    "x": 60,
+    "z": -40,
     "zone": "forge",
     "radius": 3
   },
   "audit-helm": {
     "id": "audit-helm",
     "name": "Security Audit Helm",
-    "x": -25,
-    "z": 35,
+    "x": -40,
+    "z": 45,
     "zone": "spire",
     "radius": 3
   },
   "crypto-analyzer": {
     "id": "crypto-analyzer",
     "name": "Crypto Analyzer",
-    "x": -40,
-    "z": 20,
+    "x": -60,
+    "z": 25,
     "zone": "spire",
     "radius": 3
   },
   "market-scanner": {
     "id": "market-scanner",
     "name": "Market Scanner",
-    "x": 30,
-    "z": 15,
+    "x": 35,
+    "z": -5,
     "zone": "warrens",
     "radius": 3
   },
   "chart-analyzer": {
     "id": "chart-analyzer",
     "name": "Chart Analysis Desk",
-    "x": 35,
-    "z": 5,
+    "x": 45,
+    "z": -15,
     "zone": "warrens",
     "radius": 3
   },
@@ -90,8 +90,8 @@
   "memory-archive": {
     "id": "memory-archive",
     "name": "Memory Archive",
-    "x": 25,
-    "z": -40,
+    "x": 15,
+    "z": -50,
     "zone": "general",
     "radius": 3
   }

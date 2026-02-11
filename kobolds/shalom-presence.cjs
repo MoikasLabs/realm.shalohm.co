@@ -132,9 +132,9 @@ class ShalomPresence extends CognitiveRealmClient {
       
       const time = Date.now() / 1000;
       
-      // Slow, regal movement - watching over the world
-      this.position.x = baseX + Math.sin(time * 0.3) * 1.5;
-      this.position.z = baseZ + Math.cos(time * 0.2) * 1.5;
+      // VERY small patrol radius - stay near center to avoid collision
+      this.position.x = baseX + Math.sin(time * 0.3) * 0.5; // 0.5m radius
+      this.position.z = baseZ + Math.cos(time * 0.2) * 0.5;
       this.position.rotation = Math.sin(time * 0.1) * 0.5; // Looking around
       
       this.broadcastPosition();
