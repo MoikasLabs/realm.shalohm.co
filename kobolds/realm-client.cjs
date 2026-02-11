@@ -1,9 +1,10 @@
 /**
- * Realm Client for Kobold Subagents - WITH PROPER PATHFINDING
- * Auto-connects to Shalom Realm, spawns avatar, moves with smooth pathing
+ * Realm Client for Kobold Subagents - WITH COLLISION-AWARE PATHFINDING
+ * Auto-connects to Shalom Realm, spawns avatar, moves with collision detection
  */
 
 const WebSocket = require('ws');
+const { validatePath, findSafePosition, checkCollision } = require('./collision-validator.js');
 
 const REALM_URL = process.env.REALM_WS_URL || 'wss://realm.shalohm.co/ws';
 const REALM_API = process.env.REALM_API_URL || 'https://realm.shalohm.co';
@@ -170,10 +171,19 @@ class RealmClient {
     this.startWorkIdleLoop();
   }
 
-  // PROPER WALKING using server-side pathfinding
+  // COLLISION-AWARE WALKING with server-side pathfinding and local validation
   async walkTo(targetX, targetZ) {
     if (this.isMoving) return; // Don't interrupt current movement
     this.isMoving = true;
+    this.lastMoveTime = Date.now();
+    
+    // Validate target position is safe
+    const safeTarget = findSafePosition(targetX, targetZ);
+    if (!safeTarget.original) {
+      console.warn(`[Realm] ${this.name} target (${targetX}, ${targetZ}) unsafe, using (${safeTarget.x.toFixed(1)}, ${safeTarget.z.toFixed(1)})`);
+    }
+    targetX = safeTarget.x;
+    targetZ = safeTarget.z;
     this.targetPosition = { x: targetX, z: targetZ };
     
     // Use server-side pathfinding to get obstacle-free waypoints
@@ -190,22 +200,34 @@ class RealmClient {
       const data = await res.json();
       if (data.ok && data.waypoints && data.waypoints.length > 0) {
         waypoints = data.waypoints;
-        console.log(`[Realm] ${this.name} got ${waypoints.length} waypoints from pathfinding`);
+        console.log(`[Realm] ${this.name} got ${waypoints.length} waypoints from server`);
       } else {
-        // Fallback: direct path
-        waypoints = [{ x: this.position.x, z: this.position.z }, { x: targetX, z: targetZ }];
+        throw new Error('No path returned from server');
       }
     } catch (err) {
-      console.warn(`[Realm] ${this.name} pathfinding failed:`, err.message);
-      waypoints = [{ x: this.position.x, z: this.position.z }, { x: targetX, z: targetZ }];
+      console.warn(`[Realm] ${this.name} server pathfinding failed:`, err.message);
+      // Use local collision validator as fallback
+      const localPath = validatePath(this.position.x, this.position.z, targetX, targetZ);
+      waypoints = localPath.waypoints;
+      console.log(`[Realm] ${this.name} using local path (${localPath.direct ? 'direct' : 'avoiding obstacles'})`);
     }
     
     // Walk through each waypoint
     this.broadcastAction('walk');
+    let stuckCounter = 0;
     
     for (let w = 1; w < waypoints.length; w++) {
       const waypoint = waypoints[w];
       const prev = waypoints[w - 1];
+      
+      // Validate this waypoint is safe before moving
+      const check = checkCollision(waypoint.x, waypoint.z);
+      if (!check.safe) {
+        console.warn(`[Realm] ${this.name} waypoint unsafe, finding alternative`);
+        const safe = findSafePosition(waypoint.x, waypoint.z);
+        waypoint.x = safe.x;
+        waypoint.z = safe.z;
+      }
       
       const dist = Math.sqrt((waypoint.x - prev.x)**2 + (waypoint.z - prev.z)**2);
       const steps = Math.max(10, Math.min(40, Math.floor(dist * 2)));
@@ -215,8 +237,28 @@ class RealmClient {
         const t = i / steps;
         const easedT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
         
-        this.position.x = prev.x + (waypoint.x - prev.x) * easedT;
-        this.position.z = prev.z + (waypoint.z - prev.z) * easedT;
+        const newX = prev.x + (waypoint.x - prev.x) * easedT;
+        const newZ = prev.z + (waypoint.z - prev.z) * easedT;
+        
+        // Double-check position is safe before broadcasting
+        const check = checkCollision(newX, newZ, 1.2); // 1.2m buffer
+        if (!check.safe) {
+          console.warn(`[Realm] ${this.name} would hit obstacle, stopping!`);
+          stuckCounter++;
+          if (stuckCounter > 3) {
+            // Emergency: teleport to safe position
+            const emergency = findSafePosition(this.position.x, this.position.z);
+            this.position.x = emergency.x;
+            this.position.z = emergency.z;
+            this.broadcastPosition();
+            this.say('⚠️ Stuck! Finding safe position...');
+            break;
+          }
+          continue; // Skip this step
+        }
+        
+        this.position.x = newX;
+        this.position.z = newZ;
         
         // Rotation
         const targetRotation = Math.atan2(waypoint.z - this.position.z, waypoint.x - this.position.x);
@@ -227,10 +269,11 @@ class RealmClient {
         
         this.broadcastPosition();
         await this.sleep(stepDuration);
+        this.lastMoveTime = Date.now();
       }
     }
     
-    // Finalize at target
+    // Verify final position is exactly at target
     this.position.x = targetX;
     this.position.z = targetZ;
     this.broadcastPosition();
@@ -239,8 +282,30 @@ class RealmClient {
     this.targetPosition = null;
     console.log(`[Realm] ${this.name} arrived at (${targetX.toFixed(1)}, ${targetZ.toFixed(1)})`);
   }
+  
+  // Check if agent might be stuck (no movement for 5+ seconds)
+  isStuck() {
+    if (!this.lastMoveTime) return false;
+    return (Date.now() - this.lastMoveTime) > 5000;
+  }
+  
+  // Emergency unstuck - teleport to safe position
+  async emergencyUnstuck() {
+    console.warn(`[Realm] ${this.name} EMERGENCY UNSTUCK from (${this.position.x.toFixed(1)}, ${this.position.z.toFixed(1)})`);
+    
+    // Find nearest safe position
+    const safe = findSafePosition(this.position.x, this.position.z);
+    
+    // Teleport (instant move)
+    this.position.x = safe.x;
+    this.position.z = safe.z;
+    this.broadcastPosition();
+    
+    this.say('Unstuck!');
+    console.log(`[Realm] ${this.name} teleported to safe position (${safe.x.toFixed(1)}, ${safe.z.toFixed(1)})`);
+  }
 
-  // IDLE LOOPS
+  // IDLE LOOPS with collision validation
   startCaveIdleLoop() {
     this.stopIdleLoop();
     let lastX = this.position.x;
@@ -253,21 +318,32 @@ class RealmClient {
       const cavePos = CAVE_POSITIONS[this.caveIndex];
       const time = Date.now() / 1000;
       
-      // Smooth wandering using sine waves (no jitter!)
-      this.position.x = cavePos.x + Math.sin(time * 0.5) * 2 + Math.cos(time * 0.3) * 1;
-      this.position.z = cavePos.z + Math.cos(time * 0.4) * 2 + Math.sin(time * 0.6) * 1;
+      // Calculate new position with sine waves
+      let newX = cavePos.x + Math.sin(time * 0.5) * 1.5; // Reduced from 2
+      let newZ = cavePos.z + Math.cos(time * 0.4) * 1.5; // Reduced from 2
       
-      // Face walking direction
-      const dx = this.position.x - lastX;
-      const dz = this.position.z - lastZ;
-      if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
-        this.position.rotation = Math.atan2(dz, dx);
+      // Validate position is safe before updating
+      const check = checkCollision(newX, newZ, 1.2);
+      if (check.safe) {
+        this.position.x = newX;
+        this.position.z = newZ;
+        
+        // Face walking direction
+        const dx = this.position.x - lastX;
+        const dz = this.position.z - lastZ;
+        if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
+          this.position.rotation = Math.atan2(dz, dx);
+        }
+        
+        lastX = this.position.x;
+        lastZ = this.position.z;
+        
+        this.broadcastPosition();
+      } else {
+        // Would collide - silently skip this update,
+        // but still update rotation so we're not frozen
+        this.position.rotation = Math.sin(time * 0.5) * 0.5;
       }
-      
-      lastX = this.position.x;
-      lastZ = this.position.z;
-      
-      this.broadcastPosition();
     }, 250); // 4fps updates for smooth wandering
   }
 
@@ -289,16 +365,24 @@ class RealmClient {
       // Subtle "working" movement: inspect equipment, step around
       const time = now / 1000;
       
-      // Small patrol radius around workstation (1.5 units)
-      this.position.x = baseX + Math.sin(time * 0.8) * 1.0 + Math.cos(time * 0.5) * 0.5;
-      this.position.z = baseZ + Math.cos(time * 0.6) * 1.0 + Math.sin(time * 0.4) * 0.5;
+      // Small patrol radius around workstation (reduced from 1.5 to 1.0)
+      let newX = baseX + Math.sin(time * 0.8) * 0.8 + Math.cos(time * 0.5) * 0.4;
+      let newZ = baseZ + Math.cos(time * 0.6) * 0.8 + Math.sin(time * 0.4) * 0.4;
       
-      // Rotate to face "work" at station
-      const rotationPhase = (Math.sin(time * 0.3) + 1) / 2; // 0-1
-      this.position.rotation = rotationPhase * Math.PI * 0.5 - Math.PI * 0.25; // -45 to +45 deg
-      
-      this.broadcastPosition();
-      lastUpdate = now;
+      // Validate position is safe
+      const check = checkCollision(newX, newZ, 1.2);
+      if (check.safe) {
+        this.position.x = newX;
+        this.position.z = newZ;
+        
+        // Rotate to face "work" at station
+        const rotationPhase = (Math.sin(time * 0.3) + 1) / 2;
+        this.position.rotation = rotationPhase * Math.PI * 0.5 - Math.PI * 0.25;
+        
+        this.broadcastPosition();
+        lastUpdate = now;
+      }
+      // If unsafe, skip position update - agent will look around but not move into obstacle
     }, 200); // 5fps for smooth working animation
   }
 
