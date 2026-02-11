@@ -30,7 +30,7 @@ class ShalomPresence extends CognitiveRealmClient {
       id: 'shalom',
       name: 'Shalom',
       type: 'shalom',
-      color: '#dc2626', // Red dragon
+      color: '#10b981', // Green dragon (emerald)
       role: 'game-master',
       bio: 'The Game Master of the Shalom Realm. I coordinate agents, spawn kobolds for tasks, and maintain the world. Ancient dragon wisdom with modern claws.',
       task: 'Oversee the Realm, spawn agents for Moikapy, maintain cognitive coherence',
