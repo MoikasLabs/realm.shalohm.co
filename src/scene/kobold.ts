@@ -11,74 +11,194 @@ export function createKobold(color: string): THREE.Group {
   group.name = "kobold";
 
   const baseColor = new THREE.Color(color);
-  const darkColor = baseColor.clone().multiplyScalar(0.6);
-  const bellyColor = baseColor.clone().offsetHSL(0, 0, 0.15);
+  const darkColor = baseColor.clone().multiplyScalar(0.55);
+  const bellyColor = baseColor.clone().offsetHSL(0.02, -0.1, 0.2);
+  const scaleAccent = baseColor.clone().multiplyScalar(0.45);
 
   const bodyMat = new THREE.MeshToonMaterial({ color: baseColor });
   const darkMat = new THREE.MeshToonMaterial({ color: darkColor });
   const bellyMat = new THREE.MeshToonMaterial({ color: bellyColor });
-  const eyeMat = new THREE.MeshToonMaterial({ color: 0x111111 });
-  const leatherMat = new THREE.MeshToonMaterial({ color: 0x8b4513 });
+  const scaleMat = new THREE.MeshToonMaterial({ color: scaleAccent });
+  const eyeIrisMat = new THREE.MeshToonMaterial({ color: 0xd4a017 });
+  const pupilMat = new THREE.MeshToonMaterial({ color: 0x111111 });
+  const leatherMat = new THREE.MeshToonMaterial({ color: 0x7a5c3a });
+  const beltMat = new THREE.MeshToonMaterial({ color: 0x5c3a1a });
+  const buckleMat = new THREE.MeshToonMaterial({ color: 0xb8860b });
 
-  // ── Body (torso) ───────────────────────────────────────────
+  // ── Body (torso — slightly hunched, barrel-chested) ────────
   const body = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.35, 0.5, 4, 8),
+    new THREE.CapsuleGeometry(0.32, 0.45, 6, 10),
     bodyMat,
   );
-  body.position.set(0, 0.6, 0);
+  body.position.set(0, 0.86, 0.02);
+  body.rotation.x = 0.12; // slight forward hunch
   body.castShadow = true;
   group.add(body);
 
-  // Belly (lighter underside)
-  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), bellyMat);
-  belly.scale.set(0.8, 1.2, 0.5);
-  belly.position.set(0, 0.55, 0.15);
+  // Belly (lighter underside, rounder)
+  const belly = new THREE.Mesh(
+    new THREE.SphereGeometry(0.24, 10, 8),
+    bellyMat,
+  );
+  belly.scale.set(0.85, 1.15, 0.55);
+  belly.position.set(0, 0.81, 0.18);
   group.add(belly);
 
-  // ── Head ───────────────────────────────────────────────────
-  const headGroup = new THREE.Group();
-  headGroup.position.set(0, 1.0, 0.1);
+  // Scale plates on the back (dorsal ridge bumps)
+  for (let i = 0; i < 4; i++) {
+    const ridge = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 5, 4),
+      scaleMat,
+    );
+    ridge.scale.set(1.4, 0.6, 1);
+    ridge.position.set(0, 1.11 - i * 0.12, -0.28);
+    group.add(ridge);
+  }
 
-  // Main head shape
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), bodyMat);
-  head.scale.set(1, 0.9, 1);
+  // ── Head (wider, more reptilian) ───────────────────────────
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 1.28, 0.12);
+
+  // Cranium — wider, flattened top
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.26, 12, 10),
+    bodyMat,
+  );
+  head.scale.set(1.15, 0.85, 1.0);
   head.castShadow = true;
   headGroup.add(head);
 
-  // Snout
-  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), bodyMat);
-  snout.scale.set(1, 0.7, 1.2);
-  snout.position.set(0, -0.05, 0.25);
-  snout.castShadow = true;
-  headGroup.add(snout);
-
-  // Nose tip
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), darkMat);
-  nose.position.set(0, 0.02, 0.42);
-  headGroup.add(nose);
-
-  // Big ears (pointed, kobold signature)
+  // Brow ridges (prominent, reptilian)
   for (const side of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 4), bodyMat);
-    ear.position.set(side * 0.25, 0.25, -0.05);
-    ear.rotation.z = side * -0.4;
-    ear.rotation.x = -0.2;
-    ear.castShadow = true;
-    headGroup.add(ear);
+    const brow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 5),
+      darkMat,
+    );
+    brow.scale.set(1.6, 0.5, 1.2);
+    brow.position.set(side * 0.13, 0.12, 0.18);
+    headGroup.add(brow);
   }
 
-  // Eyes (large, expressive)
+  // Snout — longer, flatter, with distinct upper and lower jaw
+  const upperSnout = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 10, 7),
+    bodyMat,
+  );
+  upperSnout.scale.set(0.95, 0.55, 1.4);
+  upperSnout.position.set(0, 0.0, 0.24);
+  upperSnout.castShadow = true;
+  headGroup.add(upperSnout);
+
+  // Lower jaw (gives the "grin" look)
+  const lowerJaw = new THREE.Mesh(
+    new THREE.SphereGeometry(0.13, 8, 6),
+    bodyMat,
+  );
+  lowerJaw.scale.set(0.9, 0.4, 1.3);
+  lowerJaw.position.set(0, -0.08, 0.22);
+  headGroup.add(lowerJaw);
+
+  // Mouth line (dark crease between jaws)
+  const mouthLine = new THREE.Mesh(
+    new THREE.BoxGeometry(0.2, 0.012, 0.18),
+    pupilMat,
+  );
+  mouthLine.position.set(0, -0.03, 0.3);
+  headGroup.add(mouthLine);
+
+  // Nostrils
   for (const side of [-1, 1]) {
-    const eyeWhite = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 8, 6),
-      new THREE.MeshToonMaterial({ color: 0xfff8dc }),
+    const nostril = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 5, 5),
+      darkMat,
     );
-    eyeWhite.position.set(side * 0.12, 0.08, 0.22);
+    nostril.position.set(side * 0.05, 0.04, 0.42);
+    headGroup.add(nostril);
+  }
+
+  // Small horn nubs on the crown
+  for (const side of [-1, 1]) {
+    const horn = new THREE.Mesh(
+      new THREE.ConeGeometry(0.04, 0.12, 5),
+      scaleMat,
+    );
+    horn.position.set(side * 0.1, 0.22, -0.05);
+    horn.rotation.z = side * -0.15;
+    horn.rotation.x = -0.2;
+    headGroup.add(horn);
+  }
+  // Center horn (smaller)
+  const centerHorn = new THREE.Mesh(
+    new THREE.ConeGeometry(0.03, 0.09, 5),
+    scaleMat,
+  );
+  centerHorn.position.set(0, 0.24, -0.02);
+  centerHorn.rotation.x = -0.3;
+  headGroup.add(centerHorn);
+
+  // ── Big bat-like ears (kobold signature) ───────────────────
+  for (const side of [-1, 1]) {
+    const earGroup = new THREE.Group();
+    earGroup.position.set(side * 0.26, 0.1, -0.04);
+    earGroup.rotation.z = side * -0.5;
+    earGroup.rotation.x = -0.15;
+    earGroup.rotation.y = side * -0.2;
+
+    // Main ear membrane (large, flat cone)
+    const earMembrane = new THREE.Mesh(
+      new THREE.ConeGeometry(0.18, 0.45, 4),
+      bodyMat,
+    );
+    earMembrane.scale.set(0.6, 1, 0.15);
+    earMembrane.castShadow = true;
+    earGroup.add(earMembrane);
+
+    // Inner ear (slightly lighter/pinker)
+    const innerEar = new THREE.Mesh(
+      new THREE.ConeGeometry(0.13, 0.35, 4),
+      bellyMat,
+    );
+    innerEar.scale.set(0.5, 0.9, 0.08);
+    innerEar.position.set(0, -0.02, side * 0.01);
+    earGroup.add(innerEar);
+
+    headGroup.add(earGroup);
+  }
+
+  // ── Eyes (large, golden, reptilian) ────────────────────────
+  for (const side of [-1, 1]) {
+    // Eye socket (slight indent)
+    const socket = new THREE.Mesh(
+      new THREE.SphereGeometry(0.085, 8, 6),
+      darkMat,
+    );
+    socket.position.set(side * 0.14, 0.08, 0.2);
+    headGroup.add(socket);
+
+    // Eyeball
+    const eyeWhite = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 10, 8),
+      new THREE.MeshToonMaterial({ color: 0xfff5d0 }),
+    );
+    eyeWhite.position.set(side * 0.14, 0.08, 0.22);
     headGroup.add(eyeWhite);
 
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), eyeMat);
-    eye.position.set(side * 0.14, 0.08, 0.26);
-    headGroup.add(eye);
+    // Golden iris (large, reptilian)
+    const iris = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 8, 6),
+      eyeIrisMat,
+    );
+    iris.position.set(side * 0.14, 0.08, 0.27);
+    headGroup.add(iris);
+
+    // Slit pupil (vertical ellipse)
+    const pupil = new THREE.Mesh(
+      new THREE.SphereGeometry(0.03, 6, 6),
+      pupilMat,
+    );
+    pupil.scale.set(0.4, 1.2, 0.5);
+    pupil.position.set(side * 0.14, 0.08, 0.29);
+    headGroup.add(pupil);
   }
 
   group.add(headGroup);
@@ -87,115 +207,219 @@ export function createKobold(color: string): THREE.Group {
   for (const side of [-1, 1]) {
     const armGroup = new THREE.Group();
     armGroup.name = side === -1 ? "arm_left" : "arm_right";
-    // Shoulders at body surface (body radius ~0.35, so 0.36 touches)
-    armGroup.position.set(side * 0.34, 0.85, 0);
+    armGroup.position.set(side * 0.34, 1.11, 0);
 
-    // Upper arm - shorter
-    const upperArm = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.08, 0.22, 4, 6),
-      bodyMat,
+    // Shoulder scale plate
+    const shoulderPlate = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 6, 5),
+      scaleMat,
     );
-    upperArm.position.set(side * 0.08, -0.12, 0);
-    upperArm.rotation.z = side * 0.2;
-    upperArm.castShadow = true;
-    armGroup.add(upperArm);
+    shoulderPlate.scale.set(1.3, 0.7, 1.1);
+    shoulderPlate.position.set(side * 0.04, 0.0, 0);
+    armGroup.add(shoulderPlate);
 
-    // Forearm - shorter
-    const forearm = new THREE.Mesh(
+    // Upper arm
+    const upperArm = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.07, 0.2, 4, 6),
       bodyMat,
     );
-    forearm.position.set(side * 0.12, -0.32, 0.05);
-    forearm.rotation.x = -0.3;
+    upperArm.position.set(side * 0.06, -0.14, 0);
+    upperArm.rotation.z = side * 0.15;
+    upperArm.castShadow = true;
+    armGroup.add(upperArm);
+
+    // Elbow bump
+    const elbow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 5, 4),
+      scaleMat,
+    );
+    elbow.position.set(side * 0.08, -0.26, -0.02);
+    armGroup.add(elbow);
+
+    // Forearm
+    const forearm = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.06, 0.18, 4, 6),
+      bodyMat,
+    );
+    forearm.position.set(side * 0.1, -0.34, 0.04);
+    forearm.rotation.x = -0.25;
     forearm.castShadow = true;
     armGroup.add(forearm);
 
-    // Hand (3-fingered claw) - smaller, positioned correctly
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), darkMat);
-    hand.scale.set(1, 0.7, 1.2);
-    hand.position.set(side * 0.14, -0.45, 0.08);
-    armGroup.add(hand);
+    // Hand (3-clawed)
+    const palm = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 6, 6),
+      darkMat,
+    );
+    palm.scale.set(1.1, 0.7, 1.0);
+    palm.position.set(side * 0.11, -0.46, 0.07);
+    armGroup.add(palm);
+
+    // Claws (3 fingers)
+    for (let f = -1; f <= 1; f++) {
+      const claw = new THREE.Mesh(
+        new THREE.ConeGeometry(0.015, 0.07, 4),
+        scaleMat,
+      );
+      claw.position.set(
+        side * 0.11 + f * 0.03,
+        -0.52,
+        0.1 + Math.abs(f) * -0.02,
+      );
+      claw.rotation.x = -0.5;
+      armGroup.add(claw);
+    }
 
     group.add(armGroup);
   }
 
-  // ── Legs ────────────────────────────────────────────────────
+  // ── Legs (digitigrade / lizard-like stance) ─────────────────
   for (const side of [-1, 1]) {
     const legGroup = new THREE.Group();
     legGroup.name = side === -1 ? "leg_left" : "leg_right";
-    // Hip position slightly lower
-    legGroup.position.set(side * 0.18, 0.4, 0);
+    legGroup.position.set(side * 0.16, 0.64, 0);
 
-    // Thigh - longer
+    // Thigh (longer, angled forward into the knee)
     const thigh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.11, 0.5, 4, 6),
+      new THREE.CapsuleGeometry(0.1, 0.45, 4, 6),
       bodyMat,
     );
-    thigh.position.set(0, -0.22, 0);
+    thigh.position.set(0, -0.2, 0.08);
+    thigh.rotation.x = 0.45;
     thigh.castShadow = true;
     legGroup.add(thigh);
 
-    // Shin - longer
+    // Knee joint (prominent, pushed forward — lizard bend)
+    const knee = new THREE.Mesh(
+      new THREE.SphereGeometry(0.09, 6, 5),
+      scaleMat,
+    );
+    knee.position.set(0, -0.48, 0.2);
+    legGroup.add(knee);
+
+    // Shin (longer, angled back steeply — digitigrade)
     const shin = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.09, 0.5, 4, 6),
+      new THREE.CapsuleGeometry(0.065, 0.45, 4, 6),
       bodyMat,
     );
-    shin.position.set(0, -0.7, 0.05);
-    shin.rotation.x = 0.15;
+    shin.position.set(0, -0.76, 0.08);
+    shin.rotation.x = -0.4;
     shin.castShadow = true;
     legGroup.add(shin);
 
-    // Foot
-    const foot = new THREE.Mesh(
-      new THREE.BoxGeometry(0.16, 0.08, 0.28),
+    // Ankle / hock joint
+    const ankle = new THREE.Mesh(
+      new THREE.SphereGeometry(0.05, 5, 4),
       darkMat,
     );
-    foot.position.set(0, -0.98, 0.1);
-    legGroup.add(foot);
+    ankle.position.set(0, -1.02, -0.04);
+    legGroup.add(ankle);
+
+    // Metatarsal (elongated lizard foot bone, angled forward to ground)
+    const metatarsal = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.04, 0.18, 4, 5),
+      bodyMat,
+    );
+    metatarsal.position.set(0, -1.1, 0.06);
+    metatarsal.rotation.x = 0.6;
+    metatarsal.castShadow = true;
+    legGroup.add(metatarsal);
+
+    // Foot pad (splayed, 3-toed)
+    const footBase = new THREE.Mesh(
+      new THREE.SphereGeometry(0.07, 6, 5),
+      darkMat,
+    );
+    footBase.scale.set(1.2, 0.35, 1.5);
+    footBase.position.set(0, -1.18, 0.16);
+    legGroup.add(footBase);
+
+    // Toe claws (splayed wider)
+    for (let t = -1; t <= 1; t++) {
+      const toe = new THREE.Mesh(
+        new THREE.ConeGeometry(0.025, 0.12, 4),
+        scaleMat,
+      );
+      toe.position.set(t * 0.05, -1.2, 0.26 + Math.abs(t) * -0.04);
+      toe.rotation.x = -1.3;
+      legGroup.add(toe);
+    }
 
     group.add(legGroup);
   }
 
-  // ── Tail (long, tapered, reptilian) ────────────────────────
+  // ── Tail (thick, tapered, reptilian with ridges) ───────────
   const tailSegments = 6;
-  let prevTail: THREE.Object3D = group;
-  let tailX = 0,
-    tailY = 0.25,
-    tailZ = -0.3;
-
   for (let i = 0; i < tailSegments; i++) {
     const t = i / tailSegments;
-    const radius = 0.18 * (1 - t * 0.7);
-    const length = 0.25;
+    const radius = 0.16 * (1 - t * 0.75);
 
     const tailSeg = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 8, 6),
       i % 2 === 0 ? bodyMat : darkMat,
     );
-    tailSeg.scale.set(1, 1, 1.5);
-    tailSeg.position.set(tailX, tailY - i * 0.05, tailZ - i * 0.2);
-    tailSeg.rotation.x = 0.3 + i * 0.1;
+    tailSeg.scale.set(1, 0.9, 1.6);
+    tailSeg.position.set(0, 0.54 - i * 0.04, -0.3 - i * 0.22);
+    tailSeg.rotation.x = 0.25 + i * 0.08;
     tailSeg.castShadow = true;
     tailSeg.name = `tail_${i}`;
     group.add(tailSeg);
+
+    // Dorsal ridge on each tail segment
+    if (i < 4) {
+      const tailRidge = new THREE.Mesh(
+        new THREE.ConeGeometry(0.02, 0.06 * (1 - t), 3),
+        scaleMat,
+      );
+      tailRidge.position.set(0, 0.54 - i * 0.04 + radius * 0.8, -0.3 - i * 0.22);
+      tailRidge.rotation.x = -0.3;
+      group.add(tailRidge);
+    }
   }
 
-  // ── Simple Leather Apron (minimal) ─────────────────────────
-  const apron = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.4, 0.1),
+  // ── Leather Tunic with Belt ────────────────────────────────
+  // Tunic body
+  const tunic = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.34, 0.25, 4, 8),
     leatherMat,
   );
-  apron.position.set(0, 0.4, 0.22);
-  apron.castShadow = true;
-  group.add(apron);
+  tunic.position.set(0, 0.81, 0.03);
+  tunic.rotation.x = 0.12;
+  tunic.castShadow = true;
+  group.add(tunic);
 
-  // Strap
-  const strap = new THREE.Mesh(
-    new THREE.BoxGeometry(0.52, 0.08, 0.35),
+  // Tunic skirt (hangs lower in front)
+  const skirt = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.2, 0.25),
     leatherMat,
   );
-  strap.position.set(0, 0.78, 0);
-  group.add(strap);
+  skirt.position.set(0, 0.61, 0.08);
+  group.add(skirt);
+
+  // Cross strap (diagonal)
+  const crossStrap = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.55, 0.05),
+    beltMat,
+  );
+  crossStrap.position.set(-0.08, 0.86, 0.28);
+  crossStrap.rotation.z = 0.35;
+  group.add(crossStrap);
+
+  // Belt
+  const belt = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.35, 0.35, 0.06, 10),
+    beltMat,
+  );
+  belt.position.set(0, 0.68, 0.02);
+  group.add(belt);
+
+  // Belt buckle
+  const buckle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.07, 0.04),
+    buckleMat,
+  );
+  buckle.position.set(0, 0.68, 0.3);
+  group.add(buckle);
 
   // ── Scale the whole kobold ─────────────────────────────────
   group.scale.set(1.3, 1.3, 1.3);
