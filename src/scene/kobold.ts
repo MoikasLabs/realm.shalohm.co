@@ -105,35 +105,36 @@ export function createKobold(color: string): THREE.Group {
   for (const side of [-1, 1]) {
     const armGroup = new THREE.Group();
     armGroup.name = side === -1 ? "arm_left" : "arm_right";
-    armGroup.position.set(side * 0.45, 0.85, 0);
+    // Shoulders closer to body (touches at ±0.35, body radius ~0.35)
+    armGroup.position.set(side * 0.38, 0.85, 0);
 
-    // Upper arm
+    // Upper arm - shorter
     const upperArm = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.08, 0.35, 4, 6),
+      new THREE.CapsuleGeometry(0.08, 0.22, 4, 6),
       bodyMat
     );
-    upperArm.position.set(side * 0.15, -0.15, 0);
-    upperArm.rotation.z = side * 0.3;
+    upperArm.position.set(side * 0.08, -0.12, 0);
+    upperArm.rotation.z = side * 0.2;
     upperArm.castShadow = true;
     armGroup.add(upperArm);
 
-    // Forearm
+    // Forearm - shorter
     const forearm = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.07, 0.3, 4, 6),
+      new THREE.CapsuleGeometry(0.07, 0.2, 4, 6),
       bodyMat
     );
-    forearm.position.set(side * 0.25, -0.45, 0.1);
-    forearm.rotation.x = -0.4;
+    forearm.position.set(side * 0.15, -0.32, 0.05);
+    forearm.rotation.x = -0.3;
     forearm.castShadow = true;
     armGroup.add(forearm);
 
-    // Hand (3-fingered claw)
+    // Hand (3-fingered claw) - smaller, positioned correctly
     const hand = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 6, 6),
+      new THREE.SphereGeometry(0.08, 6, 6),
       darkMat
     );
     hand.scale.set(1, 0.7, 1.2);
-    hand.position.set(side * 0.3, -0.65, 0.15);
+    hand.position.set(side * 0.18, -0.45, 0.08);
     armGroup.add(hand);
 
     group.add(armGroup);
@@ -143,33 +144,34 @@ export function createKobold(color: string): THREE.Group {
   for (const side of [-1, 1]) {
     const legGroup = new THREE.Group();
     legGroup.name = side === -1 ? "leg_left" : "leg_right";
-    legGroup.position.set(side * 0.2, 0.35, 0);
+    // Hip position slightly lower
+    legGroup.position.set(side * 0.18, 0.4, 0);
 
-    // Thigh
+    // Thigh - longer
     const thigh = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.1, 0.35, 4, 6),
+      new THREE.CapsuleGeometry(0.11, 0.5, 4, 6),
       bodyMat
     );
-    thigh.position.set(0, -0.15, 0);
+    thigh.position.set(0, -0.22, 0);
     thigh.castShadow = true;
     legGroup.add(thigh);
 
-    // Shin
+    // Shin - longer
     const shin = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.08, 0.35, 4, 6),
+      new THREE.CapsuleGeometry(0.09, 0.5, 4, 6),
       bodyMat
     );
-    shin.position.set(0, -0.55, 0.05);
-    shin.rotation.x = 0.2;
+    shin.position.set(0, -0.7, 0.05);
+    shin.rotation.x = 0.15;
     shin.castShadow = true;
     legGroup.add(shin);
 
     // Foot
     const foot = new THREE.Mesh(
-      new THREE.BoxGeometry(0.15, 0.08, 0.25),
+      new THREE.BoxGeometry(0.16, 0.08, 0.28),
       darkMat
     );
-    foot.position.set(0, -0.78, 0.1);
+    foot.position.set(0, -0.98, 0.1);
     legGroup.add(foot);
 
     group.add(legGroup);
