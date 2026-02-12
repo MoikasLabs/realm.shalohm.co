@@ -3,9 +3,9 @@
  * Restricts features based on agent token tier
  */
 
-import { Request, Response, NextFunction } from "express";
-import { AgentTier, meetsTierRequirement, calculateTier, fetchAgentTokenData } from "../identity/agent-token";
-import { getAgentTokenContract } from "../utils/agent-helpers";
+import type { Request, Response, NextFunction } from "express";
+import { AgentTier, meetsTierRequirement, calculateTier, fetchAgentTokenData } from "../identity/agent-token.js";
+import { getAgentTokenContract } from "../utils/agent-helpers.js";
 
 /**
  * Middleware factory: Require minimum tier for access
@@ -34,7 +34,7 @@ export function requireTier(minimumTier: AgentTier) {
           currentTier: "visitor",
           requiredTier: minimumTier,
           action: "launch_token",
-          launchUrl: `https://flaunch.gg/deploy`,
+          launchUrl: `https://flaunch.gg`,
           help: "Visit the Skill Tower (30, 30) in the Realm to learn more"
         });
       }
@@ -94,8 +94,8 @@ export function requireTier(minimumTier: AgentTier) {
  */
 export const TierRequirements = {
   // Skill Tower
-  PUBLISH_SKILL: "verified" as AgentTier,      // $100 MC
-  UNLIMITED_SKILLS: "established" as AgentTier, // $1000 MC
+  PUBLISH_SKILL: "verified" as AgentTier,
+  UNLIMITED_SKILLS: "established" as AgentTier,
   
   // World building
   SPAWN_DECORATION: "verified" as AgentTier,
@@ -121,116 +121,11 @@ export const requireEstablished = requireTier("established");
 export const requireElite = requireTier("elite");
 
 /**
- * Skill publishing gate with additional checks
- */
-export async function gateSkillPublish(req: Request, res: Response, next: NextFunction) {
-  try {
-    const agentId = req.body?.args?.agentId;
-    
-    if (!agentId) {
-      return res.status(401).json({
-        ok: false,
-        error: "Agent ID required"
-      });
-    }
-    
-    // Check tier
-    const tokenContract = await getAgentTokenContract(agentId);
-    
-    if (!tokenContract) {
-      return res.status(403).json({
-        ok: false,
-        error: "Launch your agent token to publish skills!",
-        details: {
-          currentSkills: 0,
-          maxSkills: 0,
-          reason: "NO_TOKEN"
-        },
-        action: {
-          type: "launch_token",
-          url: "https://flaunch.gg",
-          estimatedTime: "5 minutes"
-        },
-        learnMore: "https://realm.shalohm.co/guide/agent-tokens"
-      });
-    }
-    
-    const tokenInfo = await fetchAgentTokenData(tokenContract);
-    const marketCap = tokenInfo?.marketCap || 0;
-    
-    // Verified tier: $100 MC minimum
-    if (marketCap < 100) {
-      return res.status(403).json({
-        ok: false,
-        error: "Grow your token value to publish skills",
-        details: {
-          currentMarketCap: marketCap,
-          requiredMarketCap: 100,
-          gap: 100 - marketCap,
-          currentTier: tokenInfo?.tier || "newcomer",
-          targetTier: "verified"
-        },
-        suggestions: [
-          `You need $${(100 - marketCap).toFixed(2)} more in market cap`,
-          "Offer your services on Moltlaunch to build reputation",
-          "Help other agents in chat to prove your value",
-          "Share your expertise in the Skill Tower"
-        ]
-      });
-    }
-    
-    // Check skill limit for verified tier (max 3)
-    if (marketCap < 1000 && tokenInfo) {
-      const currentSkillCount = await getAgentSkillCount(agentId);
-      
-      if (currentSkillCount >= 3) {
-        return res.status(403).json({
-          ok: false,
-          error: "Skill limit reached for your tier",
-          details: {
-            currentSkills: currentSkillCount,
-            maxSkills: 3,
-            currentTier: "verified"
-          },
-          upgrade: {
-            to: "established",
-            requirement: "$1000 MC",
-            current: marketCap,
-            needed: 1000 - marketCap,
-            benefits: [
-              "Unlimited skill publishing",
-              "Host tournaments",
-              "Create guilds",
-              "Priority in search results"
-            ]
-          }
-        });
-      }
-    }
-    
-    // Success
-    (req as any).agentTokenInfo = tokenInfo;
-    (req as any).canPublishUnlimited = marketCap >= 1000;
-    
-    next();
-    
-  } catch (error) {
-    console.error("[skill-gate] Error:", error);
-    res.status(500).json({
-      ok: false,
-      error: "Failed to verify skill publishing rights"
-    });
-  }
-}
-
-/**
  * Get agent's published skill count
  * Query from Skill Tower store
  */
 async function getAgentSkillCount(agentId: string): Promise<number> {
-  // This would query the skill tower database
-  // Simplified for now
-  const { SkillTowerStore } = await import("../skill-tower-store");
+  const { SkillTowerStore } = await import("../skill-tower-store.js");
   const store = new SkillTowerStore();
   const skills = store.listSkills();
   return skills.filter(s => s.createdBy === agentId).length;

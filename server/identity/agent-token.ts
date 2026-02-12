@@ -3,7 +3,7 @@
  * Fetches token market data from DexScreener for agent reputation scoring
  */
 
-import { fetchWithTimeout } from "../utils/http";
+import { fetchWithTimeout } from "../utils/http.js";
 
 export interface AgentTokenInfo {
   contractAddress: string;
@@ -67,7 +67,7 @@ export async function fetchAgentTokenData(tokenAddress: string): Promise<AgentTo
       return null;
     }
     
-    const data = await response.json();
+    const data: any = await response.json();
     
     if (!data.pairs || data.pairs.length === 0) {
       console.warn(`[token-lookup] No trading pairs found for ${tokenAddress}`);

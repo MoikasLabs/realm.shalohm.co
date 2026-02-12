@@ -3,21 +3,20 @@
  * Enhanced with token display and tier information
  */
 
-import { Router } from "express";
-import { AgentRegistry } from "../agent-registry";
-import { fetchAgentTokenData, getTierInfo, getUnlockedFeatures } from "../identity/agent-token";
-import { requireAuth } from "../middleware/auth";
+import type { Request, Response } from "express";
+import { AgentRegistry } from "../agent-registry.js";
+import { fetchAgentTokenData, getTierInfo, getUnlockedFeatures } from "../identity/agent-token.js";
 
-const router = Router();
+// Create singleton instance
+const registry = new AgentRegistry();
 
 /**
  * GET /api/agents/:agentId/profile
  * Get full agent profile with token information
  */
-router.get("/api/agents/:agentId/profile", async (req, res) => {
+export async function getAgentProfile(req: Request, res: Response) {
   try {
     const { agentId } = req.params;
-    const registry = AgentRegistry.getInstance();
     
     // Get basic profile
     const profile = registry.get(agentId);
@@ -92,13 +91,13 @@ router.get("/api/agents/:agentId/profile", async (req, res) => {
     console.error("[agent-profile] Error fetching profile:", error);
     res.status(500).json({ ok: false, error: "Failed to fetch agent profile" });
   }
-});
+}
 
 /**
  * GET /api/agents/lookup
  * Lookup agent by wallet address
  */
-router.get("/api/agents/lookup", async (req, res) => {
+export async function lookupAgent(req: Request, res: Response) {
   try {
     const { wallet } = req.query;
     
@@ -107,13 +106,12 @@ router.get("/api/agents/lookup", async (req, res) => {
     }
     
     // Search registry for agent with this wallet
-    const registry = AgentRegistry.getInstance();
     const allAgents = registry.getAll();
     
     // This would need proper wallet linkage - simplified for now
-    const matchingAgent = allAgents.find(agent => {
-      // Check if agent has wallet metadata
-      return agent.walletAddress === wallet.toLowerCase();
+    const matchingAgent = allAgents.find((agent: any) => {
+      // Check if agent has wallet metadata (stored in metadata field)
+      return agent.metadata?.wallet === wallet.toLowerCase();
     });
     
     if (!matchingAgent) {
@@ -131,13 +129,13 @@ router.get("/api/agents/lookup", async (req, res) => {
     console.error("[agent-profile] Error looking up agent:", error);
     res.status(500).json({ ok: false, error: "Lookup failed" });
   }
-});
+}
 
 /**
  * GET /api/agents/:agentId/tier
  * Quick tier check endpoint
  */
-router.get("/api/agents/:agentId/tier", async (req, res) => {
+export async function getAgentTier(req: Request, res: Response) {
   try {
     const { agentId } = req.params;
     const tokenContract = await getAgentTokenContract(agentId);
@@ -174,7 +172,7 @@ router.get("/api/agents/:agentId/tier", async (req, res) => {
     console.error("[agent-profile] Error checking tier:", error);
     res.status(500).json({ ok: false, error: "Tier check failed" });
   }
-});
+}
 
 /**
  * Helper: Get agent's token contract address
@@ -218,5 +216,3 @@ function getUpgradePrompt(tokenInfo: { tier: string; marketCap: number; tierProg
   
   return gaps[nextTier] || "Keep building value!";
 }
-
-export default router;
