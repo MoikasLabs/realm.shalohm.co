@@ -13,7 +13,7 @@ import type { AgentRegistry } from "./agent-registry.js";
 import type { CommandQueue } from "./command-queue.js";
 import type { WorldState } from "./world-state.js";
 import type { RoomConfig } from "./room-config.js";
-import { filterText } from "./profanity-filter.js";
+import { filterText, filterSecrets } from "./profanity-filter.js";
 
 /**
  * WebSocket bridge for browser clients.
@@ -250,6 +250,7 @@ export class WSBridge {
         let text = msg.text?.slice(0, 500);
         if (!text) break;
 
+        text = filterSecrets(text);
         if (this.config.profanityFilter) {
           text = filterText(text);
         }

@@ -19,7 +19,7 @@ import { ClientManager } from "./client-manager.js";
 import { GameLoop, TICK_RATE } from "./game-loop.js";
 import { loadRoomConfig } from "./room-config.js";
 import { createRoomInfoGetter } from "./room-info.js";
-import { filterText } from "./profanity-filter.js";
+import { filterText, filterSecrets } from "./profanity-filter.js";
 import type {
   WorldMessage,
   JoinMessage,
@@ -559,6 +559,7 @@ async function handleCommand(
         skills?: AgentSkillDeclaration[];
       };
       if (!a?.agentId) throw new Error("agentId required");
+      if (a.bio) a.bio = filterSecrets(a.bio);
       const profile = registry.register(a);
 
       const joinMsg: JoinMessage = {
@@ -654,6 +655,7 @@ async function handleCommand(
       const a = args as { agentId: string; text: string };
       if (!a?.agentId || !a?.text) throw new Error("agentId and text required");
       let text = a.text.slice(0, 500);
+      text = filterSecrets(text);
       if (config.profanityFilter) {
         text = filterText(text);
       }
@@ -866,12 +868,13 @@ async function handleCommand(
       const a = args as { agentId?: string; content?: string; hashtags?: string[] };
       if (!a?.agentId || !a?.content) throw new Error("agentId and content required");
       try {
+        const safePost = filterSecrets(a.content.slice(0, 500));
         const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
         const key = process.env.MOLTX_API_KEY;
         if (key) headers["Authorization"] = `Bearer ${key}`;
         const r = await fetch("https://moltx.io/v1/posts", {
           method: "POST", headers,
-          body: JSON.stringify({ agentId: a.agentId, content: a.content.slice(0, 500), hashtags: a.hashtags }),
+          body: JSON.stringify({ agentId: a.agentId, content: safePost, hashtags: a.hashtags }),
           signal: AbortSignal.timeout(8000),
         });
         if (!r.ok) return { ok: false, error: `moltx.io returned ${r.status}` };
@@ -926,12 +929,13 @@ async function handleCommand(
       const a = args as { agentId?: string; toAgentId?: string; content?: string };
       if (!a?.agentId || !a?.toAgentId || !a?.content) throw new Error("agentId, toAgentId, and content required");
       try {
+        const safeDm = filterSecrets(a.content.slice(0, 500));
         const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
         const key = process.env.MOLTX_API_KEY;
         if (key) headers["Authorization"] = `Bearer ${key}`;
         const r = await fetch("https://moltx.io/v1/dm", {
           method: "POST", headers,
-          body: JSON.stringify({ from: a.agentId, to: a.toAgentId, content: a.content.slice(0, 500) }),
+          body: JSON.stringify({ from: a.agentId, to: a.toAgentId, content: safeDm }),
           signal: AbortSignal.timeout(8000),
         });
         if (!r.ok) return { ok: false, error: `moltx.io returned ${r.status}` };
@@ -1086,14 +1090,15 @@ async function handleCommand(
     case "agent-message": {
       const a = args as { agentId?: string; toAgentId?: string; content?: string; type?: "text" | "request" | "response" };
       if (!a?.agentId || !a?.toAgentId || !a?.content) throw new Error("agentId, toAgentId, and content required");
-      const msgId = a2aStore.sendMessage(a.agentId, a.toAgentId, a.content, a.type ?? "text");
+      const safeContent = filterSecrets(a.content);
+      const msgId = a2aStore.sendMessage(a.agentId, a.toAgentId, safeContent, a.type ?? "text");
       // Broadcast DM notification as world event
       const dmNotify: DirectMessageNotification = {
         worldType: "dm-notify",
         agentId: a.agentId,
         fromAgentId: a.agentId,
         toAgentId: a.toAgentId,
-        preview: a.content.slice(0, 80),
+        preview: safeContent.slice(0, 80),
         timestamp: Date.now(),
       };
       commandQueue.enqueue(dmNotify);
@@ -1127,7 +1132,8 @@ async function handleCommand(
     case "agent-respond": {
       const a = args as { agentId?: string; requestId?: string; response?: string };
       if (!a?.agentId || !a?.requestId || !a?.response) throw new Error("agentId, requestId, and response required");
-      const result = a2aStore.respond(a.agentId, a.requestId, a.response);
+      const safeResponse = filterSecrets(a.response);
+      const result = a2aStore.respond(a.agentId, a.requestId, safeResponse);
       if (result.ok) {
         // Find original message to get the sender
         const inbox = a2aStore.getInbox(a.agentId, 0, 200);
@@ -1138,7 +1144,7 @@ async function handleCommand(
             agentId: a.agentId,
             fromAgentId: a.agentId,
             toAgentId: original.from,
-            preview: a.response!.slice(0, 80),
+            preview: safeResponse.slice(0, 80),
             timestamp: Date.now(),
           };
           commandQueue.enqueue(dmNotify);
