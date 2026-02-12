@@ -2,6 +2,13 @@ import * as THREE from "three";
 import type { WSClient } from "../net/ws-client.js";
 import type { KeyState } from "../input/keyboard.js";
 
+function randomHSL(): string {
+  const h = Math.floor(Math.random() * 360);
+  const s = 55 + Math.floor(Math.random() * 25);
+  const l = 45 + Math.floor(Math.random() * 15);
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
 const SPEED = 8;
 const WORLD_HALF = 50;
 const SYNC_INTERVAL = 100; // ms between position syncs (10Hz)
@@ -26,7 +33,7 @@ export class PlayerController {
   private _moving = false;
   private _wasMoving = false;
   private pendingName = "Player";
-  private pendingColor = "#e91e63";
+  private pendingColor = randomHSL();
 
   constructor(ws: WSClient, camera: THREE.Camera) {
     this.ws = ws;

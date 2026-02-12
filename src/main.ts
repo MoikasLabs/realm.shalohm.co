@@ -80,7 +80,7 @@ ws.on("connected", () => {
   profileRefreshInterval = setInterval(() => ws.requestProfiles(), 30_000);
 
   // Auto-join as player
-  playerController.join("Player", "#e91e63");
+  playerController.join("Player");
 });
 ws.on("disconnected", () => {
   window.dispatchEvent(new CustomEvent("ws:disconnected"));

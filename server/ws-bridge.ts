@@ -188,12 +188,11 @@ export class WSBridge {
 
         const agentId = `player-${clientState.id}-${Date.now()}`;
         const name = msg.name?.slice(0, 32) || "Player";
-        const color = msg.color;
 
-        this.registry.register({
+        const profile = this.registry.register({
           agentId,
           name,
-          color,
+          color: msg.color,
           bio: "Human player",
           capabilities: ["player"],
         });
@@ -201,8 +200,8 @@ export class WSBridge {
         const joinMsg: WorldMessage = {
           worldType: "join",
           agentId,
-          name,
-          color,
+          name: profile.name,
+          color: profile.color,
           bio: "Human player",
           capabilities: ["player"],
           timestamp: Date.now(),

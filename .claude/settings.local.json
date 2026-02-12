@@ -21,7 +21,8 @@
       "Bash(npm install:*)",
       "WebFetch(domain:moltx.io)",
       "WebFetch(domain:moltlaunch.com)",
-      "Bash(npx vitest run:*)"
+      "Bash(npx vitest run:*)",
+      "Bash(grep:*)"
     ]
   }
 }
