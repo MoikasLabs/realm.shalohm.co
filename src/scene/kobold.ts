@@ -105,8 +105,8 @@ export function createKobold(color: string): THREE.Group {
   for (const side of [-1, 1]) {
     const armGroup = new THREE.Group();
     armGroup.name = side === -1 ? "arm_left" : "arm_right";
-    // Shoulders closer to body (touches at ±0.35, body radius ~0.35)
-    armGroup.position.set(side * 0.38, 0.85, 0);
+    // Shoulders at body surface (body radius ~0.35, so 0.36 touches)
+    armGroup.position.set(side * 0.36, 0.85, 0);
 
     // Upper arm - shorter
     const upperArm = new THREE.Mesh(
