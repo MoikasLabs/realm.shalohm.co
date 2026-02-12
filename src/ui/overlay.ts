@@ -26,7 +26,7 @@ export function setupOverlay(): OverlayAPI {
 
   const titleEl = document.createElement("span");
   titleEl.className = "overlay-title";
-  titleEl.textContent = "OpenClaw Ocean World";
+  titleEl.textContent = "Shalom's Kobold Kingdom";
   header.appendChild(titleEl);
 
   const toggleEl = document.createElement("span");
@@ -68,7 +68,7 @@ export function setupOverlay(): OverlayAPI {
 
   function render(): void {
     const sorted = Array.from(agents.values()).sort(
-      (a, b) => b.lastSeen - a.lastSeen
+      (a, b) => b.lastSeen - a.lastSeen,
     );
     countEl.textContent = `${sorted.length} agent${sorted.length !== 1 ? "s" : ""} online`;
 
@@ -98,7 +98,7 @@ export function setupOverlay(): OverlayAPI {
       item.addEventListener("click", (e) => {
         e.stopPropagation();
         window.dispatchEvent(
-          new CustomEvent("agent:select", { detail: { agentId: a.agentId } })
+          new CustomEvent("agent:select", { detail: { agentId: a.agentId } }),
         );
         // Highlight followed agent
         for (const el of listEl.children) {

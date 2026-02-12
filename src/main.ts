@@ -8,6 +8,8 @@ import { setupChatLog } from "./ui/chat-log.js";
 import { setupProfilePanel } from "./ui/profile-panel.js";
 import { setupBuildingPanel } from "./ui/building-panel.js";
 import { setupRoomInfoBar } from "./ui/room-info-bar.js";
+import { createKeyboardTracker } from "./input/keyboard.js";
+import { PlayerController } from "./player/player-controller.js";
 import * as THREE from "three";
 import type { AgentProfile, AgentState, WorldMessage, RoomInfoMessage } from "../server/types.js";
 
@@ -35,10 +37,21 @@ const effects = new EffectsManager(scene, camera);
 const buildingPanel = setupBuildingPanel(serverParam);
 const roomInfoBar = setupRoomInfoBar();
 
+// ── Input & Player ─────────────────────────────────────────────
+
+const keys = createKeyboardTracker();
+
+// ── WebSocket connection ───────────────────────────────────────
+
+const ws = new WSClient(serverParam || undefined);
+
+// Player controller needs ws + camera
+const playerController = new PlayerController(ws, camera);
+
 // ── UI ─────────────────────────────────────────────────────────
 
 const overlay = setupOverlay();
-const chatLog = setupChatLog();
+const chatLog = setupChatLog((text) => playerController.sendChat(text));
 const profilePanel = setupProfilePanel((agentId: string) => {
   // Click callback → focus camera on lobster
   const pos = lobsterManager.getPosition(agentId);
@@ -47,9 +60,8 @@ const profilePanel = setupProfilePanel((agentId: string) => {
   }
 });
 
-// ── WebSocket connection ───────────────────────────────────────
-
-const ws = new WSClient(serverParam || undefined);
+// Disable mouse pan — WASD controls the player, not pan
+controls.enablePan = false;
 
 // Bridge connection events to window for overlay status dot
 let profileRefreshInterval: ReturnType<typeof setInterval> | null = null;
@@ -61,6 +73,9 @@ ws.on("connected", () => {
   // Periodically refresh agent list (every 30s) to catch joins/leaves
   if (profileRefreshInterval) clearInterval(profileRefreshInterval);
   profileRefreshInterval = setInterval(() => ws.requestProfiles(), 30_000);
+
+  // Auto-join as player
+  playerController.join("Player", "#e91e63");
 });
 ws.on("disconnected", () => {
   window.dispatchEvent(new CustomEvent("ws:disconnected"));
@@ -68,6 +83,14 @@ ws.on("disconnected", () => {
     clearInterval(profileRefreshInterval);
     profileRefreshInterval = null;
   }
+});
+
+// Handle playerJoined response
+ws.on("playerJoined", (_raw) => {
+  const data = _raw as { agentId: string };
+  playerController.onJoined(data.agentId);
+  followAgentId = data.agentId;
+  chatLog.enableInput();
 });
 
 ws.on("snapshot", (_raw) => {
@@ -95,10 +118,14 @@ ws.on("world", (_raw) => {
 
   switch (msg.worldType) {
     case "position":
+      // Skip position echoes for our own player (we move locally)
+      if (msg.agentId === playerController.agentId) break;
       lobsterManager.updatePosition(msg.agentId, msg);
       break;
 
     case "action":
+      // Skip action echoes for our own player when moving
+      if (msg.agentId === playerController.agentId && playerController.moving) break;
       lobsterManager.setAction(msg.agentId, msg.action);
       break;
 
@@ -265,6 +292,25 @@ function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
 
+  // Update player movement
+  playerController.update(keys, delta);
+
+  // Move local player kobold immediately (bypass interpolation)
+  if (playerController.agentId) {
+    lobsterManager.setPositionImmediate(
+      playerController.agentId,
+      playerController.posX,
+      0,
+      playerController.posZ,
+      playerController.posRotation
+    );
+
+    // Set walk animation on local player while moving
+    if (playerController.moving) {
+      lobsterManager.setAction(playerController.agentId, "walk");
+    }
+  }
+
   lobsterManager.update(delta);
   effects.update(camera);
 
@@ -302,4 +348,10 @@ window.addEventListener("resize", () => {
   camera.updateProjectionMatrix();
   renderer.setSize(w, h);
   labelRenderer.setSize(w, h);
+});
+
+// ── Cleanup on tab close ───────────────────────────────────────
+
+window.addEventListener("beforeunload", () => {
+  playerController.leave();
 });

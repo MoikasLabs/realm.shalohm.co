@@ -121,7 +121,8 @@ export type WSServerMessage =
   | { type: "world"; message: WorldMessage }
   | { type: "profiles"; profiles: AgentProfile[] }
   | { type: "profile"; profile: AgentProfile }
-  | { type: "roomInfo"; info: RoomInfoMessage };
+  | { type: "roomInfo"; info: RoomInfoMessage }
+  | { type: "playerJoined"; agentId: string };
 
 export type WSClientMessage =
   | { type: "subscribe" }
@@ -129,7 +130,12 @@ export type WSClientMessage =
   | { type: "requestProfile"; agentId: string }
   | { type: "viewport"; x: number; z: number }
   | { type: "follow"; agentId: string }
-  | { type: "requestRoomInfo" };
+  | { type: "requestRoomInfo" }
+  | { type: "playerJoin"; name?: string; color?: string }
+  | { type: "playerMove"; x: number; z: number; rotation: number }
+  | { type: "playerChat"; text: string }
+  | { type: "playerAction"; action: string }
+  | { type: "playerLeave" };
 
 // ── Combined agent state for snapshot ──────────────────────────
 

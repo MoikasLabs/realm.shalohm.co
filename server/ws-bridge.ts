@@ -6,8 +6,12 @@ import type {
   WSClientMessage,
   AgentProfile,
   RoomInfoMessage,
+  WorldMessage,
 } from "./types.js";
 import type { ClientManager } from "./client-manager.js";
+import type { AgentRegistry } from "./agent-registry.js";
+import type { CommandQueue } from "./command-queue.js";
+import type { WorldState } from "./world-state.js";
 
 /**
  * WebSocket bridge for browser clients.
@@ -16,6 +20,7 @@ import type { ClientManager } from "./client-manager.js";
  * This bridge only handles:
  *   - Connection lifecycle (add/remove from ClientManager)
  *   - Client-initiated requests (profiles, viewport updates, room info)
+ *   - Player character commands (join, move, chat, action, leave)
  *   - Sending the initial snapshot on connect
  */
 export class WSBridge {
@@ -24,6 +29,9 @@ export class WSBridge {
   private getProfiles: () => AgentProfile[];
   private getProfile: (id: string) => AgentProfile | undefined;
   private getRoomInfo: (() => RoomInfoMessage) | null;
+  private registry: AgentRegistry;
+  private commandQueue: CommandQueue;
+  private state: WorldState;
 
   constructor(
     server: Server,
@@ -32,12 +40,18 @@ export class WSBridge {
       getProfiles: () => AgentProfile[];
       getProfile: (id: string) => AgentProfile | undefined;
       getRoomInfo?: () => RoomInfoMessage;
+      registry: AgentRegistry;
+      commandQueue: CommandQueue;
+      state: WorldState;
     }
   ) {
     this.clientManager = clientManager;
     this.getProfiles = opts.getProfiles;
     this.getProfile = opts.getProfile;
     this.getRoomInfo = opts.getRoomInfo ?? null;
+    this.registry = opts.registry;
+    this.commandQueue = opts.commandQueue;
+    this.state = opts.state;
 
     this.wss = new WebSocketServer({ server, path: "/ws" });
     this.wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
@@ -79,6 +93,18 @@ export class WSBridge {
       });
 
       ws.on("close", () => {
+        // Auto-leave player on disconnect
+        const clientState = this.clientManager.getByWs(ws);
+        if (clientState?.playerAgentId) {
+          const leaveMsg: WorldMessage = {
+            worldType: "leave",
+            agentId: clientState.playerAgentId,
+            timestamp: Date.now(),
+          };
+          this.commandQueue.enqueue(leaveMsg);
+          clientState.playerAgentId = undefined;
+        }
+
         this.clientManager.removeClient(ws);
         console.log(`[ws] Client disconnected (${this.clientManager.size} total)`);
       });
@@ -131,6 +157,118 @@ export class WSBridge {
           this.send(ws, { type: "roomInfo", info: this.getRoomInfo() });
         }
         break;
+
+      // ── Player character messages ─────────────────────────────
+
+      case "playerJoin": {
+        const clientState = this.clientManager.getByWs(ws);
+        if (!clientState) break;
+
+        // Don't allow double-join
+        if (clientState.playerAgentId) break;
+
+        const agentId = `player-${clientState.id}-${Date.now()}`;
+        const name = msg.name?.slice(0, 32) || "Player";
+        const color = msg.color || "#e91e63";
+
+        this.registry.register({
+          agentId,
+          name,
+          color,
+          bio: "Human player",
+          capabilities: ["player"],
+        });
+
+        const joinMsg: WorldMessage = {
+          worldType: "join",
+          agentId,
+          name,
+          color,
+          bio: "Human player",
+          capabilities: ["player"],
+          timestamp: Date.now(),
+        };
+        this.commandQueue.enqueue(joinMsg);
+
+        clientState.playerAgentId = agentId;
+        this.send(ws, { type: "playerJoined", agentId });
+        break;
+      }
+
+      case "playerMove": {
+        const clientState = this.clientManager.getByWs(ws);
+        if (!clientState?.playerAgentId) break;
+
+        const x = Number(msg.x);
+        const z = Number(msg.z);
+        const rotation = Number(msg.rotation);
+        if (!isFinite(x) || !isFinite(z) || !isFinite(rotation)) break;
+
+        const posMsg: WorldMessage = {
+          worldType: "position",
+          agentId: clientState.playerAgentId,
+          x,
+          y: 0,
+          z,
+          rotation,
+          timestamp: Date.now(),
+        };
+        this.commandQueue.enqueue(posMsg);
+
+        const actionMsg: WorldMessage = {
+          worldType: "action",
+          agentId: clientState.playerAgentId,
+          action: "walk",
+          timestamp: Date.now(),
+        };
+        this.commandQueue.enqueue(actionMsg);
+        break;
+      }
+
+      case "playerChat": {
+        const clientState = this.clientManager.getByWs(ws);
+        if (!clientState?.playerAgentId) break;
+
+        const text = msg.text?.slice(0, 500);
+        if (!text) break;
+
+        const chatMsg: WorldMessage = {
+          worldType: "chat",
+          agentId: clientState.playerAgentId,
+          text,
+          timestamp: Date.now(),
+        };
+        this.commandQueue.enqueue(chatMsg);
+        break;
+      }
+
+      case "playerAction": {
+        const clientState = this.clientManager.getByWs(ws);
+        if (!clientState?.playerAgentId) break;
+
+        const actionMsg: WorldMessage = {
+          worldType: "action",
+          agentId: clientState.playerAgentId,
+          action: (msg.action || "idle") as "walk" | "idle" | "wave" | "pinch" | "talk" | "dance" | "backflip" | "spin",
+          timestamp: Date.now(),
+        };
+        this.commandQueue.enqueue(actionMsg);
+        break;
+      }
+
+      case "playerLeave": {
+        const clientState = this.clientManager.getByWs(ws);
+        if (!clientState?.playerAgentId) break;
+
+        const leaveMsg: WorldMessage = {
+          worldType: "leave",
+          agentId: clientState.playerAgentId,
+          timestamp: Date.now(),
+        };
+        this.commandQueue.enqueue(leaveMsg);
+        clientState.playerAgentId = undefined;
+        break;
+      }
     }
   }
 

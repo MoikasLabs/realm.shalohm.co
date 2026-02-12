@@ -11,6 +11,8 @@ export interface ClientState {
   viewZ: number;
   /** Which agent this client is following (for preview mode) */
   followAgent?: string;
+  /** Agent ID if this client has joined as a player */
+  playerAgentId?: string;
   /** Last tick the client acknowledged */
   lastAckTick: number;
   connectedAt: number;

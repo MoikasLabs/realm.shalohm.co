@@ -1,13 +1,15 @@
 interface ChatLogAPI {
   addMessage(agentId: string, text: string): void;
   addSystem(text: string): void;
+  enableInput(): void;
 }
 
 /**
  * Scrollable chat log panel (bottom-left).
  * Shows broadcast messages and system events.
+ * Includes a chat input field for player messages.
  */
-export function setupChatLog(): ChatLogAPI {
+export function setupChatLog(onSendChat?: (text: string) => void): ChatLogAPI {
   const container = document.getElementById("chat-log")!;
 
   const titleEl = document.createElement("div");
@@ -18,6 +20,36 @@ export function setupChatLog(): ChatLogAPI {
   const messagesEl = document.createElement("div");
   messagesEl.className = "chat-messages";
   container.appendChild(messagesEl);
+
+  // Chat input
+  const inputEl = document.createElement("input");
+  inputEl.className = "chat-input";
+  inputEl.type = "text";
+  inputEl.placeholder = "Press Enter to chat...";
+  inputEl.maxLength = 500;
+  inputEl.disabled = true;
+  container.appendChild(inputEl);
+
+  // Stop WASD from firing while typing
+  inputEl.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+
+    if (e.key === "Enter") {
+      const text = inputEl.value.trim();
+      if (text && onSendChat) {
+        onSendChat(text);
+      }
+      inputEl.value = "";
+    }
+
+    if (e.key === "Escape") {
+      inputEl.blur();
+    }
+  });
+
+  inputEl.addEventListener("keyup", (e) => {
+    e.stopPropagation();
+  });
 
   function addEntry(className: string, content: string): void {
     const el = document.createElement("div");
@@ -44,6 +76,10 @@ export function setupChatLog(): ChatLogAPI {
     },
     addSystem(text: string) {
       addEntry("chat-system", `— ${text}`);
+    },
+    enableInput() {
+      inputEl.disabled = false;
+      inputEl.placeholder = "Type a message...";
     },
   };
 }

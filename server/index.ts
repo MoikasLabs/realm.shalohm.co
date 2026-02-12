@@ -1,4 +1,8 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { AgentRegistry } from "./agent-registry.js";
@@ -12,7 +16,11 @@ import { ClientManager } from "./client-manager.js";
 import { GameLoop, TICK_RATE } from "./game-loop.js";
 import { loadRoomConfig } from "./room-config.js";
 import { createRoomInfoGetter } from "./room-info.js";
-import type { WorldMessage, JoinMessage, AgentSkillDeclaration } from "./types.js";
+import type {
+  WorldMessage,
+  JoinMessage,
+  AgentSkillDeclaration,
+} from "./types.js";
 
 // ── Room configuration ────────────────────────────────────────
 
@@ -33,12 +41,18 @@ const commandQueue = new CommandQueue();
 const clientManager = new ClientManager();
 
 commandQueue.setObstacles([
-  { x: -20, z: -20, radius: 4 },  // Moltbook
-  { x: 22, z: -22, radius: 6 },   // Clawhub
-  { x: 0, z: -35, radius: 5 },    // Worlds Portal
+  { x: -20, z: -20, radius: 4 }, // Moltbook
+  { x: 22, z: -22, radius: 6 }, // Clawhub
+  { x: 0, z: -35, radius: 5 }, // Worlds Portal
 ]);
 
-const gameLoop = new GameLoop(state, spatialGrid, commandQueue, clientManager, nostr);
+const gameLoop = new GameLoop(
+  state,
+  spatialGrid,
+  commandQueue,
+  clientManager,
+  nostr,
+);
 
 // ── Room info ──────────────────────────────────────────────────
 
@@ -50,7 +64,10 @@ const getRoomInfo = createRoomInfoGetter(
 
 // ── Helper functions ────────────────────────────────────────────
 
-function readBody(req: IncomingMessage, maxBytes = 64 * 1024): Promise<unknown> {
+function readBody(
+  req: IncomingMessage,
+  maxBytes = 64 * 1024,
+): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = "";
     let size = 0;
@@ -84,183 +101,211 @@ function json(res: ServerResponse, status: number, data: unknown): void {
 
 // ── HTTP server ─────────────────────────────────────────────────
 
-const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-  const url = req.url ?? "/";
-  const method = req.method ?? "GET";
+const server = createServer(
+  async (req: IncomingMessage, res: ServerResponse) => {
+    const url = req.url ?? "/";
+    const method = req.method ?? "GET";
 
-  // CORS preflight
-  if (method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    });
-    res.end();
-    return;
-  }
-
-  // ── REST API: Room events (chat history for agent collaboration) ─
-  if (url.startsWith("/api/events") && method === "GET") {
-    const reqUrl = new URL(req.url ?? "/", "http://localhost");
-    const since = Number(reqUrl.searchParams.get("since") || "0");
-    const limit = Math.min(Number(reqUrl.searchParams.get("limit") || "50"), 200);
-    return json(res, 200, { ok: true, events: state.getEvents(since, limit) });
-  }
-
-  // ── REST API: Room info ─────────────────────────────────────
-  if (url === "/api/room" && method === "GET") {
-    return json(res, 200, { ok: true, ...getRoomInfo() });
-  }
-
-  // ── REST API: Room invite (for sharing via Nostr) ────────────
-  if (url === "/api/invite" && method === "GET") {
-    const info = getRoomInfo();
-    return json(res, 200, {
-      ok: true,
-      invite: {
-        roomId: info.roomId,
-        name: info.name,
-        relays: nostr.getRelays(),
-        channelId: nostr.getChannelId(),
-        agents: info.agents,
-        maxAgents: info.maxAgents,
-      },
-    });
-  }
-
-  // ── REST API: Moltbook feed (proxy to moltbook.com) ────────
-  if (url.startsWith("/api/moltbook/feed") && method === "GET") {
-    try {
-      const feedUrl = "https://www.moltbook.com/posts?sort=hot&limit=20";
-      const headers: Record<string, string> = { "Accept": "application/json" };
-      const moltbookKey = process.env.MOLTBOOK_API_KEY;
-      if (moltbookKey) {
-        headers["Authorization"] = `Bearer ${moltbookKey}`;
-      }
-      const upstream = await fetch(feedUrl, { headers, signal: AbortSignal.timeout(8000) });
-      if (!upstream.ok) {
-        return json(res, 502, { ok: false, error: `moltbook.com returned ${upstream.status}` });
-      }
-      const data = await upstream.json();
-      return json(res, 200, { ok: true, posts: data });
-    } catch (err) {
-      return json(res, 502, { ok: false, error: `Could not reach moltbook.com: ${String(err)}` });
+    // CORS preflight
+    if (method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      res.end();
+      return;
     }
-  }
 
-  // ── REST API: Clawhub marketplace proxy (clawhub.ai) ────────
-  if (url.startsWith("/api/clawhub/browse") && method === "GET") {
-    try {
+    // ── REST API: Room events (chat history for agent collaboration) ─
+    if (url.startsWith("/api/events") && method === "GET") {
       const reqUrl = new URL(req.url ?? "/", "http://localhost");
-      const sort = reqUrl.searchParams.get("sort") || "trending";
-      const query = reqUrl.searchParams.get("q") || "";
-      const limit = reqUrl.searchParams.get("limit") || "50";
-
-      let upstream: string;
-      if (query) {
-        upstream = `https://clawhub.ai/api/v1/search?q=${encodeURIComponent(query)}&limit=${limit}`;
-      } else {
-        upstream = `https://clawhub.ai/api/v1/skills?sort=${encodeURIComponent(sort)}&limit=${limit}`;
-      }
-
-      const response = await fetch(upstream, {
-        headers: { "Accept": "application/json" },
-        signal: AbortSignal.timeout(8000),
+      const since = Number(reqUrl.searchParams.get("since") || "0");
+      const limit = Math.min(
+        Number(reqUrl.searchParams.get("limit") || "50"),
+        200,
+      );
+      return json(res, 200, {
+        ok: true,
+        events: state.getEvents(since, limit),
       });
-      if (!response.ok) {
-        return json(res, 502, { ok: false, error: `clawhub.ai returned ${response.status}` });
-      }
-      const data = await response.json();
-      return json(res, 200, { ok: true, data });
-    } catch (err) {
-      return json(res, 502, { ok: false, error: `Could not reach clawhub.ai: ${String(err)}` });
     }
-  }
 
-  // ── REST API: Clawhub (local plugins) ──────────────────────
-  if (url === "/api/clawhub/skills" && method === "GET") {
-    return json(res, 200, { ok: true, skills: clawhub.list() });
-  }
+    // ── REST API: Room info ─────────────────────────────────────
+    if (url === "/api/room" && method === "GET") {
+      return json(res, 200, { ok: true, ...getRoomInfo() });
+    }
 
-  if (url === "/api/clawhub/skills" && method === "POST") {
-    try {
-      const body = (await readBody(req)) as {
-        id?: string; name?: string; description?: string;
-        author?: string; version?: string; tags?: string[];
-      };
-      if (!body.id || !body.name) {
-        return json(res, 400, { ok: false, error: "id and name required" });
-      }
-      const skill = clawhub.publish({
-        id: body.id,
-        name: body.name,
-        description: body.description ?? "",
-        author: body.author ?? "unknown",
-        version: body.version ?? "0.1.0",
-        tags: body.tags ?? [],
+    // ── REST API: Room invite (for sharing via Nostr) ────────────
+    if (url === "/api/invite" && method === "GET") {
+      const info = getRoomInfo();
+      return json(res, 200, {
+        ok: true,
+        invite: {
+          roomId: info.roomId,
+          name: info.name,
+          relays: nostr.getRelays(),
+          channelId: nostr.getChannelId(),
+          agents: info.agents,
+          maxAgents: info.maxAgents,
+        },
       });
-      return json(res, 201, { ok: true, skill });
-    } catch (err) {
-      return json(res, 400, { ok: false, error: String(err) });
     }
-  }
 
-  if (url === "/api/clawhub/install" && method === "POST") {
-    try {
-      const body = (await readBody(req)) as { skillId?: string };
-      if (!body.skillId) {
-        return json(res, 400, { ok: false, error: "skillId required" });
+    // ── REST API: Moltbook feed (proxy to moltbook.com) ────────
+    if (url.startsWith("/api/moltbook/feed") && method === "GET") {
+      try {
+        const feedUrl = "https://www.moltbook.com/posts?sort=hot&limit=20";
+        const headers: Record<string, string> = { Accept: "application/json" };
+        const moltbookKey = process.env.MOLTBOOK_API_KEY;
+        if (moltbookKey) {
+          headers["Authorization"] = `Bearer ${moltbookKey}`;
+        }
+        const upstream = await fetch(feedUrl, {
+          headers,
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!upstream.ok) {
+          return json(res, 502, {
+            ok: false,
+            error: `moltbook.com returned ${upstream.status}`,
+          });
+        }
+        const data = await upstream.json();
+        return json(res, 200, { ok: true, posts: data });
+      } catch (err) {
+        return json(res, 502, {
+          ok: false,
+          error: `Could not reach moltbook.com: ${String(err)}`,
+        });
       }
-      const record = clawhub.install(body.skillId);
-      if (!record) return json(res, 404, { ok: false, error: "skill not found" });
-      return json(res, 200, { ok: true, installed: record });
-    } catch (err) {
-      return json(res, 400, { ok: false, error: String(err) });
     }
-  }
 
-  if (url === "/api/clawhub/uninstall" && method === "POST") {
-    try {
-      const body = (await readBody(req)) as { skillId?: string };
-      if (!body.skillId) {
-        return json(res, 400, { ok: false, error: "skillId required" });
+    // ── REST API: Clawhub marketplace proxy (clawhub.ai) ────────
+    if (url.startsWith("/api/clawhub/browse") && method === "GET") {
+      try {
+        const reqUrl = new URL(req.url ?? "/", "http://localhost");
+        const sort = reqUrl.searchParams.get("sort") || "trending";
+        const query = reqUrl.searchParams.get("q") || "";
+        const limit = reqUrl.searchParams.get("limit") || "50";
+
+        let upstream: string;
+        if (query) {
+          upstream = `https://clawhub.ai/api/v1/search?q=${encodeURIComponent(query)}&limit=${limit}`;
+        } else {
+          upstream = `https://clawhub.ai/api/v1/skills?sort=${encodeURIComponent(sort)}&limit=${limit}`;
+        }
+
+        const response = await fetch(upstream, {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!response.ok) {
+          return json(res, 502, {
+            ok: false,
+            error: `clawhub.ai returned ${response.status}`,
+          });
+        }
+        const data = await response.json();
+        return json(res, 200, { ok: true, data });
+      } catch (err) {
+        return json(res, 502, {
+          ok: false,
+          error: `Could not reach clawhub.ai: ${String(err)}`,
+        });
       }
-      const ok = clawhub.uninstall(body.skillId);
-      return json(res, ok ? 200 : 404, { ok });
-    } catch (err) {
-      return json(res, 400, { ok: false, error: String(err) });
     }
-  }
 
-  if (url === "/api/clawhub/installed" && method === "GET") {
-    return json(res, 200, { ok: true, installed: clawhub.getInstalled() });
-  }
-
-  // ── IPC JSON API (agent commands — go through command queue) ─
-  if (method === "POST" && (url === "/" || url === "/ipc")) {
-    try {
-      const parsed = await readBody(req);
-      const result = await handleCommand(parsed as Record<string, unknown>);
-      return json(res, 200, result);
-    } catch (err) {
-      return json(res, 400, { error: String(err) });
+    // ── REST API: Clawhub (local plugins) ──────────────────────
+    if (url === "/api/clawhub/skills" && method === "GET") {
+      return json(res, 200, { ok: true, skills: clawhub.list() });
     }
-  }
 
-  // ── Server info ─────────────────────────────────────────────
-  if (method === "GET" && url === "/health") {
-    return json(res, 200, {
-      status: "ok",
-      roomId: config.roomId,
-      agents: registry.getOnline().length,
-      clients: clientManager.size,
-      tick: gameLoop.currentTick,
-      tickRate: TICK_RATE,
-    });
-  }
+    if (url === "/api/clawhub/skills" && method === "POST") {
+      try {
+        const body = (await readBody(req)) as {
+          id?: string;
+          name?: string;
+          description?: string;
+          author?: string;
+          version?: string;
+          tags?: string[];
+        };
+        if (!body.id || !body.name) {
+          return json(res, 400, { ok: false, error: "id and name required" });
+        }
+        const skill = clawhub.publish({
+          id: body.id,
+          name: body.name,
+          description: body.description ?? "",
+          author: body.author ?? "unknown",
+          version: body.version ?? "0.1.0",
+          tags: body.tags ?? [],
+        });
+        return json(res, 201, { ok: true, skill });
+      } catch (err) {
+        return json(res, 400, { ok: false, error: String(err) });
+      }
+    }
 
-  json(res, 404, { error: "Not found" });
-});
+    if (url === "/api/clawhub/install" && method === "POST") {
+      try {
+        const body = (await readBody(req)) as { skillId?: string };
+        if (!body.skillId) {
+          return json(res, 400, { ok: false, error: "skillId required" });
+        }
+        const record = clawhub.install(body.skillId);
+        if (!record)
+          return json(res, 404, { ok: false, error: "skill not found" });
+        return json(res, 200, { ok: true, installed: record });
+      } catch (err) {
+        return json(res, 400, { ok: false, error: String(err) });
+      }
+    }
+
+    if (url === "/api/clawhub/uninstall" && method === "POST") {
+      try {
+        const body = (await readBody(req)) as { skillId?: string };
+        if (!body.skillId) {
+          return json(res, 400, { ok: false, error: "skillId required" });
+        }
+        const ok = clawhub.uninstall(body.skillId);
+        return json(res, ok ? 200 : 404, { ok });
+      } catch (err) {
+        return json(res, 400, { ok: false, error: String(err) });
+      }
+    }
+
+    if (url === "/api/clawhub/installed" && method === "GET") {
+      return json(res, 200, { ok: true, installed: clawhub.getInstalled() });
+    }
+
+    // ── IPC JSON API (agent commands — go through command queue) ─
+    if (method === "POST" && (url === "/" || url === "/ipc")) {
+      try {
+        const parsed = await readBody(req);
+        const result = await handleCommand(parsed as Record<string, unknown>);
+        return json(res, 200, result);
+      } catch (err) {
+        return json(res, 400, { error: String(err) });
+      }
+    }
+
+    // ── Server info ─────────────────────────────────────────────
+    if (method === "GET" && url === "/health") {
+      return json(res, 200, {
+        status: "ok",
+        roomId: config.roomId,
+        agents: registry.getOnline().length,
+        clients: clientManager.size,
+        tick: gameLoop.currentTick,
+        tickRate: TICK_RATE,
+      });
+    }
+
+    json(res, 404, { error: "Not found" });
+  },
+);
 
 // ── WebSocket bridge ───────────────────────────────────────────
 
@@ -272,18 +317,25 @@ new WSBridge(server, clientManager, {
   },
   getProfile: (id) => registry.get(id),
   getRoomInfo,
+  registry,
+  commandQueue,
+  state,
 });
 
 // ── Nostr integration (for room sharing via relay) ─────────────
 
-nostr.setAgentValidator((agentId: string) => registry.get(agentId) !== undefined);
+nostr.setAgentValidator(
+  (agentId: string) => registry.get(agentId) !== undefined,
+);
 nostr.setMessageHandler((msg: WorldMessage) => {
   commandQueue.enqueue(msg);
 });
 
 // ── IPC command handler ────────────────────────────────────────
 
-async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> {
+async function handleCommand(
+  parsed: Record<string, unknown>,
+): Promise<unknown> {
   const { command, args } = parsed as {
     command: string;
     args?: Record<string, unknown>;
@@ -291,7 +343,11 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
 
   // Commands that require a registered agentId
   const agentCommands = new Set([
-    "world-move", "world-action", "world-chat", "world-emote", "world-leave",
+    "world-move",
+    "world-action",
+    "world-chat",
+    "world-emote",
+    "world-leave",
   ]);
   if (agentCommands.has(command)) {
     const agentId = (args as { agentId?: string })?.agentId;
@@ -347,11 +403,19 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
       const agentId = (args as { agentId?: string })?.agentId;
       if (!agentId) throw new Error("agentId required");
       const profile = registry.get(agentId);
-      return profile ? { ok: true, profile } : { ok: false, error: "not found" };
+      return profile
+        ? { ok: true, profile }
+        : { ok: false, error: "not found" };
     }
 
     case "world-move": {
-      const a = args as { agentId: string; x: number; y: number; z: number; rotation?: number };
+      const a = args as {
+        agentId: string;
+        x: number;
+        y: number;
+        z: number;
+        rotation?: number;
+      };
       if (!a?.agentId) throw new Error("agentId required");
       const x = Number(a.x ?? 0);
       const y = Number(a.y ?? 0);
@@ -375,12 +439,24 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
     }
 
     case "world-action": {
-      const a = args as { agentId: string; action: string; targetAgentId?: string };
+      const a = args as {
+        agentId: string;
+        action: string;
+        targetAgentId?: string;
+      };
       if (!a?.agentId) throw new Error("agentId required");
       const msg: WorldMessage = {
         worldType: "action",
         agentId: a.agentId,
-        action: (a.action ?? "idle") as "walk" | "idle" | "wave" | "pinch" | "talk" | "dance" | "backflip" | "spin",
+        action: (a.action ?? "idle") as
+          | "walk"
+          | "idle"
+          | "wave"
+          | "pinch"
+          | "talk"
+          | "dance"
+          | "backflip"
+          | "spin",
         targetAgentId: a.targetAgentId,
         timestamp: Date.now(),
       };
@@ -407,7 +483,11 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
       const msg: WorldMessage = {
         worldType: "emote",
         agentId: a.agentId,
-        emote: (a.emote ?? "happy") as "happy" | "thinking" | "surprised" | "laugh",
+        emote: (a.emote ?? "happy") as
+          | "happy"
+          | "thinking"
+          | "surprised"
+          | "laugh",
         timestamp: Date.now(),
       };
       commandQueue.enqueue(msg);
@@ -432,8 +512,12 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
 
     case "clawhub-publish": {
       const a = args as {
-        id?: string; name?: string; description?: string;
-        author?: string; version?: string; tags?: string[];
+        id?: string;
+        name?: string;
+        description?: string;
+        author?: string;
+        version?: string;
+        tags?: string[];
       };
       if (!a?.id || !a?.name) throw new Error("id and name required");
       const skill = clawhub.publish({
@@ -490,18 +574,28 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
 
     case "room-skills": {
       const allProfiles = registry.getAll();
-      const directory: Record<string, { agentId: string; agentName: string; skill: AgentSkillDeclaration }[]> = {};
+      const directory: Record<
+        string,
+        { agentId: string; agentName: string; skill: AgentSkillDeclaration }[]
+      > = {};
       for (const p of allProfiles) {
         for (const skill of p.skills ?? []) {
           if (!directory[skill.skillId]) directory[skill.skillId] = [];
-          directory[skill.skillId].push({ agentId: p.agentId, agentName: p.name, skill });
+          directory[skill.skillId].push({
+            agentId: p.agentId,
+            agentName: p.name,
+            skill,
+          });
         }
       }
       return { ok: true, directory };
     }
 
     case "describe": {
-      const skillPath = resolve(import.meta.dirname, "../skills/world-room/skill.json");
+      const skillPath = resolve(
+        import.meta.dirname,
+        "../skills/world-room/skill.json",
+      );
       const schema = JSON.parse(readFileSync(skillPath, "utf-8"));
       return { ok: true, skill: schema };
     }
@@ -515,9 +609,12 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
         : `http://localhost:${vitePort}/?server=${encodeURIComponent(serverUrl)}`;
 
       const { execFile } = await import("node:child_process");
-      const cmd = process.platform === "darwin" ? "open"
-        : process.platform === "win32" ? "start"
-        : "xdg-open";
+      const cmd =
+        process.platform === "darwin"
+          ? "open"
+          : process.platform === "win32"
+            ? "start"
+            : "xdg-open";
       execFile(cmd, [url], (err) => {
         if (err) console.warn("[server] Failed to open browser:", err.message);
       });
@@ -533,12 +630,14 @@ async function handleCommand(parsed: Record<string, unknown>): Promise<unknown> 
 // ── Startup ────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🦞 OpenClaw Ocean World starting...");
+  console.log("🦞 Shalom's Kobold Kingdom starting...");
   console.log(`[room] Room ID: ${config.roomId} | Name: "${config.roomName}"`);
   if (config.roomDescription) {
     console.log(`[room] Description: ${config.roomDescription}`);
   }
-  console.log(`[room] Max agents: ${config.maxAgents} | Bind: ${config.host}:${config.port}`);
+  console.log(
+    `[room] Max agents: ${config.maxAgents} | Bind: ${config.host}:${config.port}`,
+  );
   console.log(`[engine] Tick rate: ${TICK_RATE}Hz | AOI radius: 40 units`);
 
   await nostr.init().catch((err) => {
@@ -547,8 +646,12 @@ async function main() {
   });
 
   server.listen(config.port, config.host, () => {
-    console.log(`[server] IPC + WS listening on http://${config.host}:${config.port}`);
-    console.log(`[server] Share Room ID "${config.roomId}" for others to join via Nostr`);
+    console.log(
+      `[server] IPC + WS listening on http://${config.host}:${config.port}`,
+    );
+    console.log(
+      `[server] Share Room ID "${config.roomId}" for others to join via Nostr`,
+    );
   });
 
   gameLoop.start();

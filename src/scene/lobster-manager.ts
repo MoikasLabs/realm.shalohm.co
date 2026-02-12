@@ -1,9 +1,5 @@
 import * as THREE from "three";
-import {
-  createAgentMesh,
-  animate,
-  type SkinType,
-} from "./agent-skins.js";
+import { createAgentMesh, animate, type SkinType } from "./agent-skins.js";
 import type { AgentProfile, AgentPosition } from "../../server/types.js";
 
 interface AgentEntry {
@@ -84,7 +80,29 @@ export class LobsterManager {
     }
   }
 
-  /** Remove an agent from the scene */
+  /** Set position immediately, bypassing interpolation (for local player) */
+  setPositionImmediate(
+    agentId: string,
+    x: number,
+    y: number,
+    z: number,
+    rotation: number,
+  ): void {
+    const entry = this.agents.get(agentId);
+    if (!entry) return;
+    entry.current.x = x;
+    entry.current.y = y;
+    entry.current.z = z;
+    entry.current.rotation = rotation;
+    entry.target.x = x;
+    entry.target.y = y;
+    entry.target.z = z;
+    entry.target.rotation = rotation;
+    entry.group.position.set(x, y, z);
+    entry.group.rotation.y = rotation;
+  }
+
+  /** Remove a lobster from the scene */
   remove(agentId: string): void {
     const entry = this.agents.get(agentId);
     if (entry) {
@@ -114,7 +132,12 @@ export class LobsterManager {
    * Calculate avoidance steering vector to push the agent away from
    * nearby obstacles (rocks) and other agents.
    */
-  private getAvoidance(agentId: string, cx: number, cz: number, heading: number): { ax: number; az: number } {
+  private getAvoidance(
+    agentId: string,
+    cx: number,
+    cz: number,
+    heading: number,
+  ): { ax: number; az: number } {
     let ax = 0;
     let az = 0;
 
@@ -133,7 +156,8 @@ export class LobsterManager {
         if (relAngle < -Math.PI) relAngle += Math.PI * 2;
 
         if (Math.abs(relAngle) < Math.PI * 0.67) {
-          const strength = AVOIDANCE_FORCE * (1 - dist / (minDist + AVOIDANCE_LOOKAHEAD));
+          const strength =
+            AVOIDANCE_FORCE * (1 - dist / (minDist + AVOIDANCE_LOOKAHEAD));
           ax += (dx / dist) * strength;
           az += (dz / dist) * strength;
         }
@@ -181,7 +205,7 @@ export class LobsterManager {
           entry.profile.agentId,
           entry.current.x,
           entry.current.z,
-          entry.current.rotation
+          entry.current.rotation,
         );
 
         // Blend desired direction with avoidance
@@ -196,8 +220,10 @@ export class LobsterManager {
 
         // Turn toward target
         entry.current.rotation += angleDiff * turnSpeed;
-        if (entry.current.rotation > Math.PI) entry.current.rotation -= Math.PI * 2;
-        if (entry.current.rotation < -Math.PI) entry.current.rotation += Math.PI * 2;
+        if (entry.current.rotation > Math.PI)
+          entry.current.rotation -= Math.PI * 2;
+        if (entry.current.rotation < -Math.PI)
+          entry.current.rotation += Math.PI * 2;
 
         // Only move forward once roughly facing the direction
         if (Math.abs(angleDiff) < facingThreshold) {
@@ -217,7 +243,9 @@ export class LobsterManager {
             // Try sliding along the obstacle
             if (!this.isBlocked(entry.profile.agentId, newX, entry.current.z)) {
               entry.current.x = newX;
-            } else if (!this.isBlocked(entry.profile.agentId, entry.current.x, newZ)) {
+            } else if (
+              !this.isBlocked(entry.profile.agentId, entry.current.x, newZ)
+            ) {
               entry.current.z = newZ;
             }
           }
@@ -238,7 +266,7 @@ export class LobsterManager {
       entry.group.position.set(
         entry.current.x,
         entry.current.y,
-        entry.current.z
+        entry.current.z,
       );
       entry.group.rotation.y = entry.current.rotation;
 
@@ -313,7 +341,7 @@ export class LobsterManager {
   pick(
     event: MouseEvent,
     camera: THREE.Camera,
-    domElement: HTMLElement
+    domElement: HTMLElement,
   ): string | null {
     const rect = domElement.getBoundingClientRect();
     this.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
