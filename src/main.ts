@@ -308,18 +308,30 @@ function animate() {
     // Set walk animation on local player while moving
     if (playerController.moving) {
       lobsterManager.setAction(playerController.agentId, "walk");
+      // Snap camera back to player when they start moving
+      if (followAgentId !== playerController.agentId) {
+        followAgentId = playerController.agentId;
+      }
     }
   }
 
   lobsterManager.update(delta);
   effects.update(camera);
 
-  // Follow agent: smoothly track their position
+  // Follow agent: track their position
   if (followAgentId) {
     const pos = lobsterManager.getPosition(followAgentId);
     if (pos) {
-      const target = controls.target;
-      target.lerp(new THREE.Vector3(pos.x, pos.y + 2, pos.z), 0.08);
+      const dest = new THREE.Vector3(pos.x, pos.y + 2, pos.z);
+      if (followAgentId === playerController.agentId && playerController.moving) {
+        // Player is actively moving — move camera target + position together
+        const offset = camera.position.clone().sub(controls.target);
+        controls.target.copy(dest);
+        camera.position.copy(dest).add(offset);
+      } else {
+        // AI agent or idle player — smooth lerp
+        controls.target.lerp(dest, 0.08);
+      }
     }
   }
 

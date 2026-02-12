@@ -18,22 +18,19 @@ export function createKobold(color: string): THREE.Group {
   const darkMat = new THREE.MeshToonMaterial({ color: darkColor });
   const bellyMat = new THREE.MeshToonMaterial({ color: bellyColor });
   const eyeMat = new THREE.MeshToonMaterial({ color: 0x111111 });
-  const leatherMat = new THREE.MeshToonMaterial({ color: 0x8B4513 });
+  const leatherMat = new THREE.MeshToonMaterial({ color: 0x8b4513 });
 
   // ── Body (torso) ───────────────────────────────────────────
   const body = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.35, 0.5, 4, 8),
-    bodyMat
+    bodyMat,
   );
   body.position.set(0, 0.6, 0);
   body.castShadow = true;
   group.add(body);
 
   // Belly (lighter underside)
-  const belly = new THREE.Mesh(
-    new THREE.SphereGeometry(0.25, 8, 8),
-    bellyMat
-  );
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), bellyMat);
   belly.scale.set(0.8, 1.2, 0.5);
   belly.position.set(0, 0.55, 0.15);
   group.add(belly);
@@ -43,38 +40,26 @@ export function createKobold(color: string): THREE.Group {
   headGroup.position.set(0, 1.0, 0.1);
 
   // Main head shape
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(0.28, 10, 8),
-    bodyMat
-  );
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 10, 8), bodyMat);
   head.scale.set(1, 0.9, 1);
   head.castShadow = true;
   headGroup.add(head);
 
   // Snout
-  const snout = new THREE.Mesh(
-    new THREE.SphereGeometry(0.15, 8, 6),
-    bodyMat
-  );
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), bodyMat);
   snout.scale.set(1, 0.7, 1.2);
   snout.position.set(0, -0.05, 0.25);
   snout.castShadow = true;
   headGroup.add(snout);
 
   // Nose tip
-  const nose = new THREE.Mesh(
-    new THREE.SphereGeometry(0.06, 6, 6),
-    darkMat
-  );
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), darkMat);
   nose.position.set(0, 0.02, 0.42);
   headGroup.add(nose);
 
   // Big ears (pointed, kobold signature)
   for (const side of [-1, 1]) {
-    const ear = new THREE.Mesh(
-      new THREE.ConeGeometry(0.12, 0.4, 4),
-      bodyMat
-    );
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 4), bodyMat);
     ear.position.set(side * 0.25, 0.25, -0.05);
     ear.rotation.z = side * -0.4;
     ear.rotation.x = -0.2;
@@ -86,15 +71,12 @@ export function createKobold(color: string): THREE.Group {
   for (const side of [-1, 1]) {
     const eyeWhite = new THREE.Mesh(
       new THREE.SphereGeometry(0.08, 8, 6),
-      new THREE.MeshToonMaterial({ color: 0xfff8dc })
+      new THREE.MeshToonMaterial({ color: 0xfff8dc }),
     );
     eyeWhite.position.set(side * 0.12, 0.08, 0.22);
     headGroup.add(eyeWhite);
 
-    const eye = new THREE.Mesh(
-      new THREE.SphereGeometry(0.05, 8, 6),
-      eyeMat
-    );
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), eyeMat);
     eye.position.set(side * 0.14, 0.08, 0.26);
     headGroup.add(eye);
   }
@@ -106,12 +88,12 @@ export function createKobold(color: string): THREE.Group {
     const armGroup = new THREE.Group();
     armGroup.name = side === -1 ? "arm_left" : "arm_right";
     // Shoulders at body surface (body radius ~0.35, so 0.36 touches)
-    armGroup.position.set(side * 0.36, 0.85, 0);
+    armGroup.position.set(side * 0.34, 0.85, 0);
 
     // Upper arm - shorter
     const upperArm = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.08, 0.22, 4, 6),
-      bodyMat
+      bodyMat,
     );
     upperArm.position.set(side * 0.08, -0.12, 0);
     upperArm.rotation.z = side * 0.2;
@@ -121,20 +103,17 @@ export function createKobold(color: string): THREE.Group {
     // Forearm - shorter
     const forearm = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.07, 0.2, 4, 6),
-      bodyMat
+      bodyMat,
     );
-    forearm.position.set(side * 0.15, -0.32, 0.05);
+    forearm.position.set(side * 0.12, -0.32, 0.05);
     forearm.rotation.x = -0.3;
     forearm.castShadow = true;
     armGroup.add(forearm);
 
     // Hand (3-fingered claw) - smaller, positioned correctly
-    const hand = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 6, 6),
-      darkMat
-    );
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), darkMat);
     hand.scale.set(1, 0.7, 1.2);
-    hand.position.set(side * 0.18, -0.45, 0.08);
+    hand.position.set(side * 0.14, -0.45, 0.08);
     armGroup.add(hand);
 
     group.add(armGroup);
@@ -150,7 +129,7 @@ export function createKobold(color: string): THREE.Group {
     // Thigh - longer
     const thigh = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.11, 0.5, 4, 6),
-      bodyMat
+      bodyMat,
     );
     thigh.position.set(0, -0.22, 0);
     thigh.castShadow = true;
@@ -159,7 +138,7 @@ export function createKobold(color: string): THREE.Group {
     // Shin - longer
     const shin = new THREE.Mesh(
       new THREE.CapsuleGeometry(0.09, 0.5, 4, 6),
-      bodyMat
+      bodyMat,
     );
     shin.position.set(0, -0.7, 0.05);
     shin.rotation.x = 0.15;
@@ -169,7 +148,7 @@ export function createKobold(color: string): THREE.Group {
     // Foot
     const foot = new THREE.Mesh(
       new THREE.BoxGeometry(0.16, 0.08, 0.28),
-      darkMat
+      darkMat,
     );
     foot.position.set(0, -0.98, 0.1);
     legGroup.add(foot);
@@ -180,7 +159,9 @@ export function createKobold(color: string): THREE.Group {
   // ── Tail (long, tapered, reptilian) ────────────────────────
   const tailSegments = 6;
   let prevTail: THREE.Object3D = group;
-  let tailX = 0, tailY = 0.25, tailZ = -0.3;
+  let tailX = 0,
+    tailY = 0.25,
+    tailZ = -0.3;
 
   for (let i = 0; i < tailSegments; i++) {
     const t = i / tailSegments;
@@ -189,7 +170,7 @@ export function createKobold(color: string): THREE.Group {
 
     const tailSeg = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 8, 6),
-      i % 2 === 0 ? bodyMat : darkMat
+      i % 2 === 0 ? bodyMat : darkMat,
     );
     tailSeg.scale.set(1, 1, 1.5);
     tailSeg.position.set(tailX, tailY - i * 0.05, tailZ - i * 0.2);
@@ -202,7 +183,7 @@ export function createKobold(color: string): THREE.Group {
   // ── Simple Leather Apron (minimal) ─────────────────────────
   const apron = new THREE.Mesh(
     new THREE.BoxGeometry(0.5, 0.4, 0.1),
-    leatherMat
+    leatherMat,
   );
   apron.position.set(0, 0.4, 0.22);
   apron.castShadow = true;
@@ -211,7 +192,7 @@ export function createKobold(color: string): THREE.Group {
   // Strap
   const strap = new THREE.Mesh(
     new THREE.BoxGeometry(0.52, 0.08, 0.35),
-    leatherMat
+    leatherMat,
   );
   strap.position.set(0, 0.78, 0);
   group.add(strap);
@@ -327,9 +308,8 @@ export function animateBackflip(group: THREE.Group, time: number): void {
   const phase = (time % cycleDuration) / cycleDuration;
 
   // Smooth flip
-  const eased = phase < 0.5
-    ? 2 * phase * phase
-    : 1 - Math.pow(-2 * phase + 2, 2) / 2;
+  const eased =
+    phase < 0.5 ? 2 * phase * phase : 1 - Math.pow(-2 * phase + 2, 2) / 2;
 
   group.rotation.x = eased * Math.PI * 2;
 

@@ -96,12 +96,14 @@ export class WSBridge {
         // Auto-leave player on disconnect
         const clientState = this.clientManager.getByWs(ws);
         if (clientState?.playerAgentId) {
+          const agentId = clientState.playerAgentId;
           const leaveMsg: WorldMessage = {
             worldType: "leave",
-            agentId: clientState.playerAgentId,
+            agentId,
             timestamp: Date.now(),
           };
           this.commandQueue.enqueue(leaveMsg);
+          this.registry.remove(agentId);
           clientState.playerAgentId = undefined;
         }
 
@@ -260,12 +262,14 @@ export class WSBridge {
         const clientState = this.clientManager.getByWs(ws);
         if (!clientState?.playerAgentId) break;
 
+        const agentId = clientState.playerAgentId;
         const leaveMsg: WorldMessage = {
           worldType: "leave",
-          agentId: clientState.playerAgentId,
+          agentId,
           timestamp: Date.now(),
         };
         this.commandQueue.enqueue(leaveMsg);
+        this.registry.remove(agentId);
         clientState.playerAgentId = undefined;
         break;
       }
