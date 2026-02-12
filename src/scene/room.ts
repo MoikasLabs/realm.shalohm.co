@@ -297,17 +297,19 @@ export function createScene() {
     glow.position.set(x, y + 0.3, z);
     scene.add(glow);
     
-    // Warm torch point light with shadow casting
+    // Warm torch point light (only large torches cast shadows to stay within GPU varying limits)
     const baseIntensity = large ? 3.5 : 2.2;
     const lightRadius = large ? 35 : 22;
     const torchLight = new THREE.PointLight(0xff9944, baseIntensity, lightRadius);
     torchLight.position.set(x, y + 0.5, z);
-    torchLight.castShadow = true;
-    torchLight.shadow.mapSize.width = 1024;
-    torchLight.shadow.mapSize.height = 1024;
-    torchLight.shadow.bias = -0.001;
-    torchLight.shadow.camera.near = 0.1;
-    torchLight.shadow.camera.far = 40;
+    torchLight.castShadow = !!large;
+    if (large) {
+      torchLight.shadow.mapSize.width = 1024;
+      torchLight.shadow.mapSize.height = 1024;
+      torchLight.shadow.bias = -0.001;
+      torchLight.shadow.camera.near = 0.1;
+      torchLight.shadow.camera.far = 40;
+    }
     scene.add(torchLight);
     
     // Store for animation
@@ -428,7 +430,7 @@ export function createScene() {
     
     scene.add(crystalGroup);
     
-    // Spotlight beaming down
+    // Spotlight beaming down (only large crystals cast shadows to stay within GPU varying limits)
     const spotIntensity = zoneColor.intensity * (central ? 1.5 : 1.0);
     const spotLight = new THREE.SpotLight(zoneColor.color, spotIntensity);
     spotLight.position.set(x, y - 0.5, z);
@@ -436,12 +438,14 @@ export function createScene() {
     spotLight.penumbra = 0.4;
     spotLight.decay = 1.5;
     spotLight.distance = 50;
-    spotLight.castShadow = true;
-    spotLight.shadow.mapSize.width = 1024;
-    spotLight.shadow.mapSize.height = 1024;
-    spotLight.shadow.bias = -0.0001;
-    spotLight.shadow.camera.near = 0.5;
-    spotLight.shadow.camera.far = 50;
+    spotLight.castShadow = size === "large";
+    if (size === "large") {
+      spotLight.shadow.mapSize.width = 1024;
+      spotLight.shadow.mapSize.height = 1024;
+      spotLight.shadow.bias = -0.0001;
+      spotLight.shadow.camera.near = 0.5;
+      spotLight.shadow.camera.far = 50;
+    }
     spotLight.target.position.set(x, 0, z);
     scene.add(spotLight);
     scene.add(spotLight.target);
