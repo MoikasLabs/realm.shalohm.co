@@ -148,6 +148,10 @@ ws.on("world", (_raw) => {
       effects.showEmote(msg.agentId, msg.emote);
       break;
 
+    case "clear-emote":
+      effects.removeEmote(msg.agentId);
+      break;
+
     case "profile":
       effects.updateLabel(msg.agentId, msg.name, msg.color);
       overlay.updateAgent({

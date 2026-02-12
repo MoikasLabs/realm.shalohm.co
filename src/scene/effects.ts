@@ -16,7 +16,7 @@ interface BubbleEntry {
 interface EmoteEntry {
   object: CSS2DObject;
   agentId: string;
-  expiresAt: number;
+  // No expiry — agent controls duration via world-clear-emote command
 }
 
 // Reusable vector to avoid allocation in update loop
@@ -128,13 +128,10 @@ export class EffectsManager {
     }
   }
 
-  /** Show an emote icon above a lobster (auto-expires after 3s) */
+  /** Show an emote icon above a lobster (agent controls duration via world-clear-emote) */
   showEmote(agentId: string, emote: string): void {
-    const existing = this.emotes.get(agentId);
-    if (existing) {
-      disposeCSS2D(existing.object);
-      this.emotes.delete(agentId);
-    }
+    // Remove existing emote first
+    this.removeEmote(agentId);
 
     const emojiMap: Record<string, string> = {
       happy: "\u{1F60A}",
@@ -155,10 +152,18 @@ export class EffectsManager {
     const entry: EmoteEntry = {
       object: obj,
       agentId,
-      expiresAt: Date.now() + 3000,
     };
     this.emotes.set(agentId, entry);
     this.attachToAgent(agentId, obj);
+  }
+
+  /** Remove an emote (agent-controlled) */
+  removeEmote(agentId: string): void {
+    const entry = this.emotes.get(agentId);
+    if (entry) {
+      disposeCSS2D(entry.object);
+      this.emotes.delete(agentId);
+    }
   }
 
   /** Per-frame update: expire old bubbles/emotes, proximity check */
@@ -174,13 +179,8 @@ export class EffectsManager {
       }
     }
 
-    // Expire emotes
-    for (const [id, entry] of this.emotes) {
-      if (now >= entry.expiresAt) {
-        disposeCSS2D(entry.object);
-        this.emotes.delete(id);
-      }
-    }
+    // Note: Emotes don't auto-expire — agents control duration via removeEmote()
+    // Proximity check still applies below
 
     // Proximity-based visibility
     const camPos = camera.position;
